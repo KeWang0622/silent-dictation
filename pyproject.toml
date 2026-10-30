@@ -1,0 +1,27 @@
+[project]
+name = "silent-dictation"
+version = "0.1.0"
+description = "Local, camera-based silent dictation for macOS (visual speech recognition)."
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "torch>=2.5",
+  "numpy",
+  "opencv-contrib-python>=4.9",
+  "mediapipe>=1.2",
+  "sentencepiece",
+  "six",
+  "packaging",
+  "pillow",
+  "pyobjc-framework-Quartz; sys_platform == 'darwin'",
+  "pyobjc-framework-Cocoa; sys_platform == 'darwin'",
+  "pyobjc-framework-AVFoundation; sys_platform == 'darwin'",
+]
+
+[project.optional-dependencies]
+llm = ["mlx-lm>=0.30; sys_platform == 'darwin'", "huggingface-hub"]
+
+[project.urls]
+Homepage = "https://github.com/KeWang0622/silent-dictation"
+
+[tool.uv]
+package = false

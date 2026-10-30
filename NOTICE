@@ -1,0 +1,33 @@
+Silent Dictation
+Copyright 2026 Ke Wang and Silent Dictation contributors
+
+Licensed under the Apache License, Version 2.0 (see LICENSE). This NOTICE lists third-party
+material included in, or downloaded by, this project.
+
+Inspiration
+  The idea of typing by silent mouthing was prompted by Aarush Yadav's announcement of Subvocal
+  (https://x.com/AarushYadav47/status/2116198463847408066, 30 October 2026), which uses glasses
+  with non-contact sensing. Silent Dictation is an independent, camera-only, software experiment and
+  is not affiliated with or endorsed by Subvocal.
+
+Included source code
+  third_party/espnet/
+    Derived from ESPnet (https://github.com/espnet/espnet), Apache-2.0, as packaged with the visual
+    front-end by Pingchuan Ma / Imperial College London in Auto-AVSR
+    (https://github.com/mpc001/auto_avsr, Apache-2.0) and redistributed in Chaplin by Amanvir Parhar
+    (https://github.com/amanvirparhar/chaplin, MIT). Modified here: Python 3.12+ compatibility
+    (distutils removed), Apple MPS device support in CTC prefix scoring, unused debugger imports removed.
+  silentdict/mean_face_68.npy
+    Reference mean face from Auto-AVSR (Apache-2.0), used to align the mouth crop.
+  silentdict/roi.py
+    Re-implementation of the Auto-AVSR / Chaplin mouth-cropping procedure for MediaPipe 1.x landmarks.
+  The real-time push-to-talk + LLM correction design follows Chaplin (MIT).
+
+Models downloaded by setup.sh (not included in this repository)
+  Auto-AVSR visual speech recognition model trained on LRS3 (LRS3_V_WER19.1) and its subword language
+  model, by Pingchuan Ma et al., mirrored on Hugging Face by Amanvir Parhar. The authors release these
+  weights for non-commercial research use; they are not covered by this project's licence, and personal
+  models fine-tuned from them inherit their terms.
+  SentencePiece unigram5000 model from Auto-AVSR (Apache-2.0).
+  MediaPipe Face Landmarker by Google (Apache-2.0).
+  Qwen3-4B-Instruct-2507 (4-bit MLX conversion by mlx-community), by the Qwen team (Apache-2.0).

@@ -1,0 +1,103 @@
+# Calibration sentences. Mouth each one silently, the way you would in public.
+# Short, everyday dictation: messages, work, scheduling, coding and small talk.
+can you send me the slides before the meeting
+i will be there in about ten minutes
+let me check my calendar and get back to you
+thanks for the update this looks great
+could we move the call to tomorrow morning
+please review the pull request when you have time
+the build is failing on the main branch
+i think we should ship this next week
+what time works best for you
+sounds good let's do that
+i am running a little late today
+can you share the link to the document
+let's grab lunch on friday
+i just pushed a fix for the bug
+the meeting has been moved to three o'clock
+i agree with your point about the design
+please add me to the email thread
+we need more data before we decide
+let me know if you have any questions
+i will write the summary tonight
+the train is delayed by twenty minutes
+can you call me when you are free
+this is the most important part of the project
+send the invoice to the finance team
+i forgot my laptop charger at home
+do you want to meet at the coffee shop
+the results look much better than last time
+we should test this on a real device
+please do not merge this yet
+i will take care of it this afternoon
+could you explain how this function works
+the new version is much faster
+remind me to buy milk on the way home
+how was your weekend
+i really appreciate your help with this
+the server went down last night
+we can talk about it after the standup
+please update the numbers in the spreadsheet
+i need to finish this report by monday
+what do you think about the new plan
+let's keep it simple for now
+i have a doctor's appointment at noon
+the package should arrive on thursday
+can we schedule a quick sync this week
+i will follow up with the customer
+the model is still training on the cluster
+open the terminal and run the tests
+i will be working from home tomorrow
+that is a really good question
+we are almost done with the first draft
+please turn off the lights when you leave
+can you pick up the kids after school
+i would like to order the chicken salad
+the weather is beautiful today
+we missed the deadline by two days
+let's start the meeting without him
+add a comment explaining this change
+i have not seen the latest version yet
+this will take a few more hours
+happy birthday hope you have a great day
+can you double check the address
+we should hire another engineer
+the flight lands at seven in the evening
+please write down the main action items
+i am not sure that is the right approach
+let's revisit this next quarter
+my phone battery is almost dead
+we need to fix the memory leak first
+the paper was accepted at the conference
+please rename this variable to something clearer
+i will send you the details by email
+do you have time for a quick question
+we can use the camera to read lips
+the coffee machine is broken again
+i will review the code after lunch
+please keep me posted on the progress
+let's try a different learning rate
+the user interface needs more polish
+call me back when you get this message
+i think the test data is too small
+we finally fixed the login problem
+can you book a table for four people
+the documentation is out of date
+i will be offline for the next hour
+let's celebrate when the launch is done
+please print two copies of the contract
+it is too noisy to talk here
+we should write a blog post about this
+the battery lasts the whole day
+i need a few more minutes to finish
+could you lower the volume a little
+the demo went really well yesterday
+let me think about it overnight
+we are going to need a bigger budget
+please check the logs for any errors
+my train leaves at half past eight
+the store closes at nine tonight
+can you resend the calendar invite
+i like the second option better
+let's deploy the change to staging first
+i am typing this without making a sound

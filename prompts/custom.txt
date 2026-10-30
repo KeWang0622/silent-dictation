@@ -1,0 +1,2 @@
+# Put your own frequent phrases here, one per line (names, projects, jargon).
+# They are recorded first during calibration and help the most.

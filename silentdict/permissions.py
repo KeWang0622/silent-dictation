@@ -1,0 +1,39 @@
+"""Camera permission handling.
+
+OpenCV cannot show the macOS camera prompt from a background thread, so ask on the main
+thread (before the capture thread starts) through AVFoundation.
+"""
+from __future__ import annotations
+
+import time
+
+STATUS = {0: "not determined", 1: "restricted", 2: "denied", 3: "authorized"}
+
+
+def camera_status() -> int:
+    from AVFoundation import AVCaptureDevice, AVMediaTypeVideo
+
+    return int(AVCaptureDevice.authorizationStatusForMediaType_(AVMediaTypeVideo))
+
+
+def ensure_camera_access(timeout: float = 120.0) -> bool:
+    """Returns True when the camera may be used; shows the system prompt if needed (main thread)."""
+    from AVFoundation import AVCaptureDevice, AVMediaTypeVideo
+    from Foundation import NSDate, NSRunLoop
+
+    status = camera_status()
+    if status == 3:
+        return True
+    if status in (1, 2):
+        return False
+    answer = {}
+    AVCaptureDevice.requestAccessForMediaType_completionHandler_(
+        AVMediaTypeVideo, lambda granted: answer.setdefault("granted", bool(granted)))
+    end = time.time() + timeout
+    while "granted" not in answer and time.time() < end:
+        NSRunLoop.currentRunLoop().runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(0.1))
+    return answer.get("granted", False)
+
+
+CAMERA_HELP = ("Camera access is off for the app running this command. Enable it in System Settings > "
+               "Privacy & Security > Camera (for Terminal, iTerm, VS Code...), then restart that app.")

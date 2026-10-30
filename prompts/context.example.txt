@@ -1,0 +1,5 @@
+# Words and names you use often, one per line. The local language model uses them
+# to choose between look-alike readings (for example a colleague's name or a project name).
+# Your copy lives in data/personal/context.txt (created on first run, never committed).
+GitHub
+Slack
