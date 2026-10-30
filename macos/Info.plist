@@ -10,9 +10,13 @@
   <key>CFBundleShortVersionString</key><string>@VERSION@</string>
   <key>CFBundleVersion</key><string>@VERSION@</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
-  <key>LSUIElement</key><true/>
+  <key>LSUIElement</key><false/>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSSupportsAutomaticTermination</key><false/>
+  <key>NSSupportsSuddenTermination</key><false/>
+  <key>NSHumanReadableCopyright</key><string>Apache-2.0. Lip-reading weights: non-commercial research use.</string>
   <key>NSCameraUsageDescription</key>
   <string>Silent Dictation reads your lip movements to type what you silently mouth. Video is processed on this Mac and never uploaded.</string>
 </dict>

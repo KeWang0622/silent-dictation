@@ -27,9 +27,10 @@ person in front of a laptop camera is harder, so expect higher error rates befor
 Lip shapes, facial hair, teeth, lighting and especially how someone mouths *without* voicing differ
 from the training data. Speaker adaptation is effective with little data: *Personalized Lip Reading:
 Adapting to Your Unique Lip Movements with Vision and Language* (Yeo et al., AAAI 2025) reports clear
-gains from minutes of a target speaker's video using LoRA/prompt tuning. Silent Dictation does the
-simplest robust version: full fine-tuning with augmentation, early stopping on a fixed held-out set,
-and activation only when held-out WER improves.
+gains from minutes of a target speaker's video using LoRA/prompt tuning. Silent Dictation does a
+simple, robust version: it tries a light adaptation (visual front-end, normalisation layers and biases)
+and a full fine-tune, both with augmentation, picks the epoch and strategy on a fixed held-out set, and
+activates the result only when held-out WER beats both the base model and your previous personal model.
 
 ## Language model correction
 

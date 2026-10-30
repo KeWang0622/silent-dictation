@@ -15,8 +15,8 @@ import numpy as np
 import torch
 
 from . import paths
-from .dataset import Item, load_items
-from .text import corpus_wer
+from .dataset import Item, NotEnoughData, load_items
+from .text import accept_rewrite, corpus_wer
 from .vsr import DEFAULT_DECODE, LipReader, Tokenizer, batch_loss, load_vsr_model, pick_device, roi_to_tensor
 
 
@@ -53,9 +53,11 @@ def freeze_batchnorm(model):
                 p.requires_grad_(False)
 
 
-def decode_items(reader: LipReader, items: list[Item], rewriter=None) -> list[tuple[str, str]]:
+def decode_items(reader: LipReader, items: list[Item], rewriter=None, on_item=None) -> list[tuple[str, str]]:
     pairs = []
-    for it in items:
+    for i, it in enumerate(items):
+        if on_item:
+            on_item(i / max(1, len(items)))
         hyps = reader(it.roi(), nbest=5)
         hyp = hyps[0].text if hyps else ""
         if rewriter is not None and hyps:
@@ -64,10 +66,24 @@ def decode_items(reader: LipReader, items: list[Item], rewriter=None) -> list[tu
     return pairs
 
 
+STRATEGIES = {
+    # Adapts the visual front-end, normalisation layers and biases: few parameters, robust with little data.
+    "light": {"lr": 1e-4, "epochs": 10},
+    # Adapts every weight with a small learning rate: best once you have more sentences.
+    "full": {"lr": 3e-5, "epochs": 10},
+}
+
+
+def _trainable(name: str, scope: str) -> bool:
+    if scope == "full":
+        return True
+    return name.startswith(("encoder.frontend", "encoder.embed")) or "norm" in name or name.endswith(".bias")
+
+
 def fine_tune(train_items, val_items=None, epochs: int = 12, lr: float = 3e-5, batch_size: int = 6,
               device: str = "auto", freeze_frontend: bool = False, seed: int = 0, log=print,
-              quick_reader: LipReader | None = None):
-    """Returns (best_state_dict_on_cpu, history). quick_reader is used for fast per-epoch validation."""
+              quick_reader: LipReader | None = None, scope: str = "full", on_epoch=None):
+    """Returns (best_state_dict_on_cpu, history, best_score). quick_reader gives fast per-epoch validation."""
     dev = pick_device(device)
     rng = np.random.default_rng(seed)
     torch.manual_seed(seed)
@@ -76,8 +92,12 @@ def fine_tune(train_items, val_items=None, epochs: int = 12, lr: float = 3e-5, b
     labels = {it.id: torch.tensor(tok.encode(it.text)) for it in train_items}
     rois = {it.id: it.roi() for it in train_items}
 
-    params = [p for n, p in model.named_parameters()
-              if not (freeze_frontend and n.startswith("encoder.frontend"))]
+    params = []
+    for n, p in model.named_parameters():
+        use = _trainable(n, scope) and not (freeze_frontend and n.startswith("encoder.frontend"))
+        p.requires_grad_(use)
+        if use:
+            params.append(p)
     opt = torch.optim.AdamW(params, lr=lr, weight_decay=0.01)
     steps_per_epoch = max(1, math.ceil(len(train_items) / batch_size))
     total = epochs * steps_per_epoch
@@ -115,49 +135,73 @@ def fine_tune(train_items, val_items=None, epochs: int = 12, lr: float = 3e-5, b
         history.append(entry)
         log(f"  epoch {epoch:2d}  loss {entry['loss']:.3f}" +
             (f"  val WER {entry['val_wer']:.1%}" if "val_wer" in entry else "") + f"  ({entry['seconds']}s)")
+        if on_epoch:
+            on_epoch(epoch, epochs, entry)
         if score < best_wer:
             best_wer = score
             best_state = {k: v.detach().to("cpu", copy=True) for k, v in model.state_dict().items()}
     model.eval()
-    return best_state, history
+    return best_state, history, best_wer
 
 
-def run(epochs: int = 12, lr: float = 3e-5, batch_size: int = 6, device: str = "auto",
-        freeze_frontend: bool = False, min_items: int = 20, use_llm: bool | None = None, log=print) -> dict:
+def run(epochs: int | None = None, lr: float | None = None, batch_size: int = 6, device: str = "auto",
+        freeze_frontend: bool = False, min_items: int = 20, use_llm: bool | None = None, log=print,
+        progress=None, strategies=("light", "full")) -> dict:
+    """progress(stage, fraction) receives: baseline, adapt, tune, llm, done."""
+    progress = progress or (lambda stage, frac: None)
     train_items = load_items("train")
     val_items = load_items("val")
     if len(train_items) + len(val_items) < min_items:
-        raise SystemExit(f"Only {len(train_items) + len(val_items)} personal clips; record at least {min_items} "
-                         "with 'silentdict calibrate' first.")
+        raise NotEnoughData(f"Only {len(train_items) + len(val_items)} personal sentences so far. Record at least "
+                            f"{min_items} in Calibrate first.")
     log(f"Personal clips: {len(train_items)} train, {len(val_items)} held out")
 
     # 1) baseline on the held-out clips
+    progress("baseline", 0.0)
     reader = LipReader(device=device, personal=False)
-    base_pairs = decode_items(reader, val_items)
+    base_pairs = decode_items(reader, val_items, on_item=lambda f: progress("baseline", 0.6 * f))
     base_wer = corpus_wer(base_pairs)
     log(f"Base model WER on your held-out clips: {base_wer:.1%}")
     current_wer = None
     if paths.PERSONAL_WEIGHTS.exists():
         current = LipReader(device=device, personal=True)
-        current_wer = corpus_wer(decode_items(current, val_items))
+        current_wer = corpus_wer(decode_items(current, val_items, on_item=lambda f: progress("baseline", 0.6 + 0.4 * f)))
         del current
         log(f"Current personal model WER on the same clips: {current_wer:.1%}")
 
-    # 2) fine-tune, choosing the epoch by held-out WER with a fast decoder (beam 5, no LM)
+    # 2) adapt with each strategy, choosing epoch and strategy by held-out WER (fast decoder: beam 5, no LM)
     quick = LipReader(device=device, personal=False, decode={"beam_size": 5, "lm_weight": 0.0})
     t0 = time.time()
-    state, hist = fine_tune(train_items, val_items, epochs=epochs, lr=lr, batch_size=batch_size,
-                            device=device, freeze_frontend=freeze_frontend, log=log, quick_reader=quick)
+    best_run, hist, strategy = None, [], None
+    for k, name in enumerate(strategies):
+        cfg = dict(STRATEGIES[name])
+        cfg["epochs"] = epochs or cfg["epochs"]
+        cfg["lr"] = lr or cfg["lr"]
+        log(f"Adapting ({name}: lr {cfg['lr']}, {cfg['epochs']} epochs)")
+
+        def on_epoch(e, total, entry, k=k):
+            progress("adapt", (k + e / total) / len(strategies))
+
+        state, h, score = fine_tune(train_items, val_items, epochs=cfg["epochs"], lr=cfg["lr"], batch_size=batch_size,
+                                    device=device, freeze_frontend=freeze_frontend, log=log, quick_reader=quick,
+                                    scope=name, on_epoch=on_epoch)
+        log(f"  {name}: best quick held-out WER {score:.1%}")
+        if best_run is None or score < best_run[0]:
+            best_run, hist, strategy = (score, state), h, name
+    state = best_run[1]
     del quick
-    log(f"Fine-tuning took {time.time() - t0:.0f}s")
+    log(f"Adaptation took {time.time() - t0:.0f}s; best strategy: {strategy}")
 
     # 3) full decoder with the personal weights; tune the language-model weight on held-out clips
+    progress("tune", 0.0)
     reader.model.load_state_dict(state)
     best = None
-    for lm_weight in (0.0, 0.15, 0.3, 0.5):
+    weights = (0.0, 0.15, 0.3, 0.5)
+    for i, lm_weight in enumerate(weights):
         reader.set_decode(lm_weight=lm_weight)
-        w = corpus_wer(decode_items(reader, val_items))
+        w = corpus_wer(decode_items(reader, val_items, on_item=lambda f, i=i: progress("tune", (i + f) / len(weights))))
         log(f"  personal model, LM weight {lm_weight}: WER {w:.1%}")
+        progress("tune", (i + 1) / len(weights))
         if best is None or w < best[0]:
             best = (w, lm_weight)
     personal_wer, lm_weight = best
@@ -165,10 +209,20 @@ def run(epochs: int = 12, lr: float = 3e-5, batch_size: int = 6, device: str = "
 
     # 4) does the local LLM rewrite help *you*? Decide from data.
     llm_wer = None
-    from .rewrite import DEFAULT_LLM
-    if use_llm is not False and DEFAULT_LLM.exists():
+    if use_llm is not False and paths.LLM_DIR.exists():
+        progress("llm", 0.0)
         from .rewrite import Rewriter
-        llm_wer = corpus_wer(decode_items(reader, val_items, rewriter=Rewriter()))
+        rw = Rewriter()
+        pairs = []
+        for it in val_items:
+            hyps = reader(it.roi(), nbest=5)
+            if not hyps:
+                pairs.append((it.text, ""))
+                continue
+            offered = [h.text for h in hyps if h.score >= hyps[0].score - 2.5]
+            out = rw(offered)
+            pairs.append((it.text, out if accept_rewrite(out, offered) else hyps[0].text))
+        llm_wer = corpus_wer(pairs)
         log(f"  personal model + local LLM rewrite: WER {llm_wer:.1%}")
 
     # 5) keep whichever model is best on the held-out clips: new personal, current personal or base
@@ -200,28 +254,32 @@ def run(epochs: int = 12, lr: float = 3e-5, batch_size: int = 6, device: str = "
     report = {
         "time": time.strftime("%Y-%m-%d %H:%M"), "train_clips": len(train_items), "val_clips": len(val_items),
         "base_wer": base_wer, "previous_personal_wer": current_wer, "personal_wer": personal_wer,
-        "llm_wer": llm_wer, "active": winner, "decode": decode, "epochs": hist,
+        "llm_wer": llm_wer, "active": winner, "strategy": strategy, "decode": decode, "epochs": hist,
         "examples": [{"ref": r, "base": b} for r, b in base_pairs[:10]],
     }
     paths.REPORTS.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     json.dump(report, open(paths.REPORTS / f"train-{stamp}.json", "w"), indent=2)
-    progress = paths.REPORTS / "progress.csv"
-    new = not progress.exists()
-    with open(progress, "a", newline="") as f:
+    report["active_wer"] = options[winner]
+    progress_csv = paths.REPORTS / "progress.csv"
+    new = not progress_csv.exists()
+    with open(progress_csv, "a", newline="") as f:
         w = csv.writer(f)
         if new:
-            w.writerow(["time", "train_clips", "val_clips", "base_wer", "personal_wer", "llm_wer", "active"])
+            w.writerow(["time", "train_clips", "val_clips", "base_wer", "personal_wer", "llm_wer", "active",
+                        "active_wer"])
         w.writerow([report["time"], len(train_items), len(val_items), f"{base_wer:.4f}", f"{personal_wer:.4f}",
-                    "" if llm_wer is None else f"{llm_wer:.4f}", {"new": "new personal", "current":
-                                                                  "previous personal", "base": "base"}[winner]])
+                    "" if llm_wer is None else f"{llm_wer:.4f}",
+                    {"new": "new personal", "current": "previous personal", "base": "base"}[winner],
+                    f"{options[winner]:.4f}"])
+    progress("done", 1.0)
     return report
 
 
 def evaluate(device: str = "auto", log=print) -> dict:
     val_items = load_items("val")
     if not val_items:
-        raise SystemExit("No held-out clips yet. Run 'silentdict calibrate' first.")
+        raise NotEnoughData("No held-out sentences yet. Calibrate in the app first.")
     out = {}
     for name, personal in (("base", False), ("personal", True)):
         if personal and not paths.PERSONAL_WEIGHTS.exists():

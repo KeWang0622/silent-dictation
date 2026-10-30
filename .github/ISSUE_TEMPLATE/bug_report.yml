@@ -1,0 +1,29 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: The last lines of ~/Library/Application Support/Silent Dictation/data/app.log
+      render: text
+  - type: input
+    id: mac
+    attributes:
+      label: Mac and macOS version
+      placeholder: MacBook Pro M3, macOS 26.1
+    validations:
+      required: true
+  - type: input
+    id: camera
+    attributes:
+      label: Camera
+      placeholder: Built-in camera, iPhone (Continuity Camera), external webcam…

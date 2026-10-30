@@ -13,7 +13,7 @@ DEFAULTS = {
     "llm": "auto",               # "auto" (decided by calibration) | "on" | "off"
     "history": True,             # keep mouth clips of dictation for review
     "overlay": True,             # floating indicator at the bottom of the screen
-    "language": "auto",          # "auto" | "zh" | "en" (app restart needed)
+    "mode": "balanced",          # "fast" | "balanced" | "accurate" (beam size)
     "onboarded": False,
 }
 

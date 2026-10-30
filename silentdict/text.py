@@ -39,6 +39,41 @@ def corpus_wer(pairs) -> float:
     return errs / max(total, 1)
 
 
+def align(ref: str, hyp: str) -> list[dict]:
+    """Word alignment for display: ok / sub / del (missed) / ins (extra)."""
+    r, h = normalize(ref).lower().split(), normalize(hyp).lower().split()
+    n, m = len(r), len(h)
+    d = [[0] * (m + 1) for _ in range(n + 1)]
+    for i in range(n + 1):
+        d[i][0] = i
+    for j in range(m + 1):
+        d[0][j] = j
+    for i in range(1, n + 1):
+        for j in range(1, m + 1):
+            d[i][j] = min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (r[i - 1] != h[j - 1]))
+    out, i, j = [], n, m
+    while i > 0 or j > 0:
+        if i > 0 and j > 0 and d[i][j] == d[i - 1][j - 1] + (r[i - 1] != h[j - 1]):
+            out.append({"op": "ok" if r[i - 1] == h[j - 1] else "sub", "ref": r[i - 1], "hyp": h[j - 1]})
+            i, j = i - 1, j - 1
+        elif i > 0 and d[i][j] == d[i - 1][j] + 1:
+            out.append({"op": "del", "ref": r[i - 1], "hyp": ""})
+            i -= 1
+        else:
+            out.append({"op": "ins", "ref": "", "hyp": h[j - 1]})
+            j -= 1
+    return out[::-1]
+
+
+def accept_rewrite(rewritten: str, offered: list[str]) -> bool:
+    """The LLM may pick one of the offered candidates or change at most one word of the best one."""
+    out = normalize(rewritten).split()
+    if any(out == normalize(c).split() for c in offered):
+        return True
+    best = normalize(offered[0]).split()
+    return len(out) == len(best) and edit_distance(out, best) <= 1
+
+
 def sentence_case(text: str) -> str:
     """Fallback formatting when no language model is available."""
     words = text.lower().split()

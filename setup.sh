@@ -1,21 +1,25 @@
 #!/usr/bin/env bash
-# Install Silent Dictation: a Python environment plus checksum-verified model files.
-# Usage: ./setup.sh [--no-llm] [--accept-model-license]
+# Install Silent Dictation: a Python environment plus checksum-verified model files (about 1 GB).
+# Usage: ./setup.sh [--with-llm] [--accept-model-license]
+#   --with-llm               also install the optional on-device language model for AI clean-up (+2 GB)
+#   --accept-model-license   do not ask before downloading the model weights
 set -euo pipefail
 cd "$(dirname "$0")"
 
-WITH_LLM=1
+WITH_LLM=0
 ACCEPT=0
 for arg in "$@"; do
   case "$arg" in
+    --with-llm) WITH_LLM=1 ;;
     --no-llm) WITH_LLM=0 ;;
     --accept-model-license) ACCEPT=1 ;;
-    -h|--help) echo "usage: ./setup.sh [--no-llm] [--accept-model-license]"; exit 0 ;;
+    -h|--help) sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 1 ;;
   esac
 done
 
 [[ "$(uname -s)" == "Darwin" ]] || { echo "Silent Dictation currently supports macOS only." >&2; exit 1; }
+[[ "$(uname -m)" == "arm64" ]] || echo "Note: Silent Dictation is tested on Apple Silicon; Intel Macs will be slow." >&2
 command -v uv >/dev/null || { echo "Install uv first: brew install uv" >&2; exit 1; }
 
 cat <<'EOF'
@@ -82,9 +86,7 @@ snapshot_download("mlx-community/Qwen3-4B-Instruct-2507-4bit",
 EOF
 fi
 
-chmod +x bin/silentdict
+chmod +x bin/silentdict bin/build-app
 echo
-echo "Done. Next steps:"
-echo "  bin/silentdict doctor --prompt     # check camera, permissions and models"
-echo "  bin/silentdict calibrate           # about 5 minutes of silent sentences, then personal training"
-echo "  bin/silentdict run                 # hold Right Option, mouth a sentence, release"
+echo "Done. Next:"
+echo "  bin/build-app --install     # builds Silent Dictation.app into /Applications and opens it"

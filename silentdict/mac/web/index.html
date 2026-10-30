@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Silent Dictation</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<aside class="sidebar">
+  <div class="brand">
+    <img src="logo.svg" alt="">
+    <div>
+      <div class="brand-name">Silent Dictation</div>
+      <div class="brand-sub">Type without a sound</div>
+    </div>
+  </div>
+  <nav>
+    <button class="nav" data-page="home"><svg viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.5l8.5 7V19a1.5 1.5 0 0 1-1.5 1.5h-4.5v-6h-5v6H5A1.5 1.5 0 0 1 3.5 19z"/></svg>Home</button>
+    <button class="nav" data-page="calibrate"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" class="fill"/></svg>Calibrate<span class="badge" id="navCal"></span></button>
+    <button class="nav" data-page="history"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>History<span class="badge" id="navHist"></span></button>
+    <button class="nav" data-page="settings"><svg viewBox="0 0 24 24"><path d="M4 7h9m4 0h3M4 12h3m4 0h9M4 17h11m4 0h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg>Settings</button>
+  </nav>
+  <div class="side-foot">
+    <button class="side-status" id="sideStatus" data-page="home"><span class="dot"></span><span class="txt">Starting…</span></button>
+    <div class="side-hint" id="sideHint"></div>
+  </div>
+</aside>
+
+<main id="main">
+  <!-- ============================== SETUP ============================== -->
+  <section class="page" id="page-setup">
+    <div class="steps" id="steps"><i></i><i></i><i></i><i></i><i></i></div>
+
+    <div class="step" data-step="0">
+      <img class="hero-logo" src="logo.svg" alt="">
+      <h1 class="center">Type by mouthing words</h1>
+      <p class="lead center">Hold <span class="kbd-inline">fn</span>, silently mouth a sentence at your camera, and it's typed wherever your cursor is.<br>No sound. No microphone. Everything stays on this Mac.</p>
+      <div class="feature-row">
+        <div class="feature"><div class="f-icon violet"><svg viewBox="0 0 24 24"><path d="M4 12.5c2.2-2.6 4.6-4 6.4-4 .7 0 1.2.3 1.6.7.4-.4.9-.7 1.6-.7 1.8 0 4.2 1.4 6.4 4-2.7.2-5.3.3-8 .3s-5.3-.1-8-.3z"/><path d="M4 13.5c2.7.3 5.3.4 8 .4s5.3-.1 8-.4c-1.8 3.3-4.6 5-8 5s-6.2-1.7-8-5z"/><path d="M3 3l18 18" class="cut"/></svg></div><b>Silent</b><span>No sound and no microphone. Works in libraries, open offices and on trains.</span></div>
+        <div class="feature"><div class="f-icon mint"><svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg></div><b>Private</b><span>Video is processed on this Mac and never uploaded or saved.</span></div>
+        <div class="feature"><div class="f-icon amber"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="M12 12l7-7m0 0h-3.5M19 5v3.5"/></svg></div><b>Learns you</b><span>A five-minute calibration adapts the model to your lips.</span></div>
+      </div>
+      <div class="center"><button class="btn primary lg" data-act="step" data-to="1">Get started</button></div>
+    </div>
+
+    <div class="step" data-step="1">
+      <h1>Allow three permissions</h1>
+      <p class="lead">macOS asks once for each. You can change them later in System Settings.</p>
+      <div class="perm-list" id="permList"></div>
+      <div class="note warn hidden" id="restartNote">Input Monitoring is on. Restart Silent Dictation so the key starts working.
+        <button class="btn" data-act="restart">Restart now</button></div>
+      <div class="step-nav"><button class="btn ghost" data-act="step" data-to="0">Back</button>
+        <button class="btn primary" id="permNext" data-act="step" data-to="2">Continue</button></div>
+    </div>
+
+    <div class="step" data-step="2">
+      <h1>Check your camera</h1>
+      <p class="lead">Sit about an arm's length away with light on your face. The box should sit on your mouth.</p>
+      <div class="cam-grid">
+        <div class="cam" data-cam><img alt=""><div class="cam-box"></div><div class="cam-empty">Camera is off</div><div class="cam-problem"></div></div>
+        <div class="cam-side">
+          <label class="field-label">Camera</label>
+          <select class="select" data-setting="camera_name" id="camSelectSetup"></select>
+          <div class="checks" id="camChecks"></div>
+          <div class="mouth-view"><img data-mouth alt=""><span>What the model sees</span></div>
+        </div>
+      </div>
+      <div class="step-nav"><button class="btn ghost" data-act="step" data-to="1">Back</button>
+        <button class="btn primary" data-act="step" data-to="3">Looks good</button></div>
+    </div>
+
+    <div class="step" data-step="3">
+      <h1>Choose your key</h1>
+      <p class="lead">Hold it to dictate, release to type. Double-tap it for hands-free; press again to stop.</p>
+      <div class="key-pick">
+        <div class="keycap big" data-keycap><span class="kc">fn</span><svg viewBox="0 0 24 24" class="globe"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.6 3.5 5.4 3.5 8.5s-1.2 5.9-3.5 8.5c-2.3-2.6-3.5-5.4-3.5-8.5S9.7 6.1 12 3.5z"/></svg></div>
+        <div>
+          <div class="seg" data-setting="key">
+            <button data-value="fn">fn</button><button data-value="right_option">Right ⌥</button>
+            <button data-value="right_command">Right ⌘</button><button data-value="right_control">Right ⌃</button>
+          </div>
+          <p class="hint" id="keyTest">Press and hold the key to test it.</p>
+        </div>
+      </div>
+      <div class="note hidden" id="globeNote">So fn doesn't open the emoji picker, set <b>System Settings › Keyboard › Press 🌐 key to › Do Nothing</b>.
+        <button class="btn" data-act="openSettings" data-kind="keyboard">Open Keyboard Settings</button></div>
+      <div class="note warn hidden" id="conflictNote"></div>
+      <div class="step-nav"><button class="btn ghost" data-act="step" data-to="2">Back</button>
+        <button class="btn primary" data-act="step" data-to="4">Continue</button></div>
+    </div>
+
+    <div class="step" data-step="4">
+      <h1>Teach it your lips</h1>
+      <p class="lead">Everyone mouths words differently. Read a few sentences silently and Silent Dictation adapts a personal model to you, on this Mac. It is the single biggest boost to accuracy.</p>
+      <div class="cal-teaser">
+        <div class="teaser-num">~5<small>min</small></div>
+        <ul><li>60 short sentences, one at a time</li><li>Instant feedback on what the model read</li><li>Trains in the background in a few minutes</li></ul>
+      </div>
+      <div class="step-nav"><button class="btn ghost" data-act="finishSetup">Skip for now</button>
+        <button class="btn primary" data-act="finishSetup" data-then="calibrate">Start calibration</button></div>
+    </div>
+  </section>
+
+  <!-- ============================== HOME ============================== -->
+  <section class="page" id="page-home">
+    <header class="page-head"><h1>Home</h1></header>
+    <div class="hero card">
+      <div class="keycap" data-keycap><span class="kc" data-keylabel>fn</span></div>
+      <div class="hero-body">
+        <h2 id="heroTitle">Hold fn and mouth your words</h2>
+        <p id="heroText">Release to type into any app. Double-tap for hands-free.</p>
+        <div class="chips" id="heroChips"></div>
+      </div>
+    </div>
+    <div class="banner hidden" id="calBanner">
+      <div><b>Calibrate for much better accuracy</b><span>Five minutes of silent sentences teaches the model your lips.</span></div>
+      <button class="btn primary" data-act="go" data-page="calibrate">Calibrate</button>
+    </div>
+    <div class="banner warn hidden" id="setupBanner">
+      <div><b>Setup isn't finished</b><span id="setupBannerText"></span></div>
+      <button class="btn" data-act="go" data-page="setup">Finish setup</button>
+    </div>
+    <div class="grid3">
+      <div class="card stat"><span class="stat-label">Dictations</span><span class="stat-num" id="statDict">0</span></div>
+      <div class="card stat"><span class="stat-label">Words typed</span><span class="stat-num" id="statWords">0</span></div>
+      <div class="card stat"><span class="stat-label">Accuracy on your lips</span><span class="stat-num" id="statAcc">—</span><span class="stat-foot" id="statAccFoot">Calibrate to measure</span></div>
+    </div>
+    <div class="card try">
+      <div class="card-head"><h3>Try it here</h3><span class="muted">While this window is in front, results appear here instead of being pasted.</span></div>
+      <div class="try-box" id="tryBox"><div class="try-empty">Hold <span class="kbd-inline" data-keylabel>fn</span> and silently mouth “how are you doing today”.</div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Recent</h3><button class="link" data-act="go" data-page="history">Review all</button></div>
+      <ul class="rlist" id="recentList"></ul>
+    </div>
+  </section>
+
+  <!-- ============================== CALIBRATE ============================== -->
+  <section class="page" id="page-calibrate">
+    <div class="cal-view" id="calIntro">
+      <header class="page-head"><h1>Calibrate</h1><p class="sub">Silently read sentences so the model adapts to your face and the way you mouth words.</p></header>
+      <div class="cal-intro">
+        <div>
+          <div class="options" id="calOptions">
+            <button class="option" data-count="30"><b>Quick</b><span>30 sentences</span><span>about 3 min</span></button>
+            <button class="option" data-count="60"><b>Standard</b><span>60 sentences</span><span>about 5 min</span><em>Recommended</em></button>
+            <button class="option" data-count="100"><b>Thorough</b><span>100 sentences</span><span>about 9 min</span></button>
+          </div>
+          <div class="checks" id="calChecks"></div>
+          <ul class="tips">
+            <li>Mouth each sentence the way you will in public, clearly but without sound.</li>
+            <li>Hold the key for the whole sentence, then release.</li>
+            <li>Keep your face centred and lit from the front.</li>
+          </ul>
+          <div class="row gap"><button class="btn primary lg" data-act="calStart">Start calibration</button>
+            <button class="btn ghost hidden" id="trainNowBtn" data-act="train">Train with what I have</button></div>
+        </div>
+        <div class="cam small" data-cam><img alt=""><div class="cam-box"></div><div class="cam-empty">Camera is off</div><div class="cam-problem"></div></div>
+      </div>
+      <div class="card progress-card">
+        <div class="card-head"><h3>Your progress</h3><span class="muted" id="clipCount"></span></div>
+        <div id="accChart" class="chart"></div>
+      </div>
+    </div>
+
+    <div class="cal-view" id="calSession">
+      <div class="session">
+        <div class="session-left">
+          <div class="cam" data-cam><img alt=""><div class="cam-box"></div><div class="cam-empty">Starting camera…</div><div class="cam-problem"></div><div class="rec-badge">REC</div></div>
+          <div class="meter" id="calMeter"></div>
+        </div>
+        <div class="session-right">
+          <div class="session-top"><span id="calCounter">Sentence 1 of 60</span><span id="calAccuracy"></span></div>
+          <div class="progress"><i id="calBar"></i></div>
+          <div class="prompt" id="calPrompt"></div>
+          <div class="prompt-next" id="calNext"></div>
+          <div class="hold-hint"><div class="keycap mini" data-keycap><span class="kc" data-keylabel>fn</span></div><span id="calHint">Hold, mouth it silently, release</span></div>
+          <div class="cal-status" id="calStatus"></div>
+          <div class="feedback" id="calFeedback"></div>
+        </div>
+      </div>
+      <div class="session-actions">
+        <button class="btn ghost" data-act="calRedo">Redo last</button>
+        <button class="btn ghost" data-act="calSkip">Skip</button>
+        <span class="spacer"></span>
+        <button class="btn ghost" data-act="calStop">Stop</button>
+        <button class="btn primary" id="calFinish" data-act="train">Finish &amp; train</button>
+      </div>
+    </div>
+
+    <div class="cal-view" id="calTraining">
+      <div class="training card">
+        <div class="train-ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" class="track"/><circle cx="60" cy="60" r="52" class="bar" id="trainRing"/></svg><span id="trainPct">0%</span></div>
+        <h2 id="trainTitle">Training your personal model</h2>
+        <p class="sub" id="trainStage">Measuring your starting accuracy…</p>
+        <p class="hint small" id="trainHint">This takes a few minutes on this Mac. You can close the window; you'll see a note when it's done. Dictation pauses until then.</p>
+        <div class="result hidden" id="trainResult">
+          <div><span class="r-label">Before</span><span class="r-num" id="resBefore">–</span></div>
+          <div class="arrow">→</div>
+          <div><span class="r-label">After</span><span class="r-num good" id="resAfter">–</span></div>
+        </div>
+        <p class="sub hidden" id="trainNote"></p>
+        <details><summary>Details</summary><pre id="trainLog"></pre></details>
+        <div class="row gap center hidden" id="trainDone">
+          <button class="btn" data-act="calMore">Record 20 more</button>
+          <button class="btn primary" data-act="go" data-page="home">Done</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== HISTORY ============================== -->
+  <section class="page" id="page-history">
+    <header class="page-head row"><div><h1>History</h1><p class="sub">Confirm or correct what was read. Every saved sentence makes your personal model better.</p></div>
+      <button class="btn primary" data-act="train" id="histTrain">Train personal model</button></header>
+    <div class="seg small" id="histFilter"><button data-f="review" class="on">To review</button><button data-f="all">All</button></div>
+    <ul class="hlist" id="histList"></ul>
+    <div class="empty hidden" id="histEmpty"><div class="empty-icon">✓</div><b>All caught up</b><span>New dictations will show up here.</span></div>
+  </section>
+
+  <!-- ============================== SETTINGS ============================== -->
+  <section class="page" id="page-settings">
+    <header class="page-head"><h1>Settings</h1></header>
+
+    <div class="group"><h4>Shortcut</h4>
+      <div class="card list">
+        <div class="lrow"><div><b>Dictation key</b><span>Hold to dictate · double-tap for hands-free</span></div>
+          <div class="seg" data-setting="key"><button data-value="fn">fn</button><button data-value="right_option">Right ⌥</button><button data-value="right_command">Right ⌘</button><button data-value="right_control">Right ⌃</button></div></div>
+        <div class="lrow hidden" id="setConflict"><div><b class="warn-t">Conflict</b><span id="setConflictText"></span></div></div>
+      </div></div>
+
+    <div class="group"><h4>Camera</h4>
+      <div class="card list">
+        <div class="lrow"><div><b>Camera</b><span id="setCamStatus">—</span></div><select class="select" data-setting="camera_name" id="camSelect"></select></div>
+        <div class="lrow"><div><b>Keep camera on</b><span>Faster start versus less camera time</span></div>
+          <div class="seg" data-setting="camera_policy"><button data-value="warm">2 min after use</button><button data-value="always">Always</button><button data-value="on_demand">Only while dictating</button></div></div>
+        <div class="lrow cam-row"><div class="cam tiny" data-cam><img alt=""><div class="cam-box"></div><div class="cam-empty">Camera is off</div><div class="cam-problem"></div></div></div>
+      </div></div>
+
+    <div class="group"><h4>Recognition</h4>
+      <div class="card list">
+        <div class="lrow"><div><b>Mode</b><span id="modeHelp">Balanced speed and accuracy</span></div>
+          <div class="seg" data-setting="mode"><button data-value="fast">Fast</button><button data-value="balanced">Balanced</button><button data-value="accurate">Accurate</button></div></div>
+        <div class="lrow"><div><b>AI clean-up</b><span id="llmHelp">A small on-device language model fixes look-alike words. Auto turns it on only if calibration shows it helps you.</span></div>
+          <div class="seg" data-setting="llm" id="llmSeg"><button data-value="auto">Auto</button><button data-value="on">On</button><button data-value="off">Off</button></div></div>
+        <div class="lrow"><div><b>Personal model</b><span id="personalHelp">—</span></div><button class="btn" data-act="go" data-page="calibrate">Calibrate</button></div>
+      </div></div>
+
+    <div class="group"><h4>General</h4>
+      <div class="card list">
+        <div class="lrow"><div><b>Floating indicator</b><span>Shows reading and transcribing at the bottom of the screen</span></div><label class="switch"><input type="checkbox" data-setting="overlay"><i></i></label></div>
+        <div class="lrow"><div><b>Keep clips for review</b><span>Stores small grey mouth crops (no full video) so you can correct and retrain</span></div><label class="switch"><input type="checkbox" data-setting="history"><i></i></label></div>
+        <div class="lrow"><div><b>Open at login</b><span>Starts quietly in the background</span></div><label class="switch"><input type="checkbox" data-setting="login"><i></i></label></div>
+      </div></div>
+
+    <div class="group"><h4>Permissions</h4><div class="card list" id="permSettings"></div></div>
+
+    <div class="group" id="about"><h4>About</h4>
+      <div class="card about">
+        <img src="logo.svg" alt="">
+        <div>
+          <b>Silent Dictation <span id="version"></span></b>
+          <span>Open-source, on-device lip reading for macOS. Inspired by <a href="#" data-url="https://x.com/AarushYadav47/status/2116198463847408066">Aarush Yadav's Subvocal</a>; not affiliated.</span>
+          <span>Built on <a href="#" data-url="https://github.com/mpc001/auto_avsr">Auto-AVSR</a>, <a href="#" data-url="https://github.com/amanvirparhar/chaplin">Chaplin</a> and <a href="#" data-url="https://ai.google.dev/edge/mediapipe">MediaPipe</a>. The default lip-reading weights are for non-commercial research use.</span>
+          <div class="row gap"><button class="btn" data-act="openURL" data-url="https://github.com/KeWang0622/silent-dictation">GitHub</button>
+            <button class="btn" data-act="openData">Open data folder</button><button class="btn ghost" data-act="quit">Quit</button></div>
+        </div>
+      </div></div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

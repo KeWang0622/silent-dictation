@@ -1,31 +1,114 @@
 #!/usr/bin/env bash
-# Build "Silent Dictation.app" for this checkout. Usage: bin/build-app [--install]
-#   --install   also copy the app to /Applications (so it shows up in Spotlight and Launchpad)
-# The app runs the code and models in this folder, so keep the folder where it is.
+# Build Silent Dictation.app, install it and open it.   Usage: bin/build-app [--no-open] [--force]
+#
+#   * the app goes to /Applications (or ~/Applications if /Applications is not writable)
+#   * code, models and the Python environment are synced to
+#     ~/Library/Application Support/Silent Dictation/runtime, so this source folder can live anywhere
+#     (models and .venv are APFS clones there: they use no extra disk space)
+#   * the app bundle is only rebuilt when the launcher changes, so macOS keeps your permissions;
+#     --force rebuilds it anyway (you then need to allow Camera, Input Monitoring and Accessibility again)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
-APP="$ROOT/build/Silent Dictation.app"
-INSTALL=0
-[[ "${1:-}" == "--install" ]] && INSTALL=1
-[[ -x "$ROOT/.venv/bin/python" ]] || { echo "Run ./setup.sh first." >&2; exit 1; }
-VERSION="$(PYTHONPATH="$ROOT" "$ROOT/.venv/bin/python" -c 'import silentdict; print(silentdict.__version__)')"
+OPEN=1
+FORCE=0
+for arg in "$@"; do
+  case "$arg" in
+    --no-open) OPEN=0 ;;
+    --force) FORCE=1 ;;
+    --install) ;;  # accepted for compatibility: installing is the default
+    -h|--help) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown option: $arg" >&2; exit 1 ;;
+  esac
+done
 
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-clang -O2 -Wall -mmacosx-version-min=13.0 -o "$APP/Contents/MacOS/Silent Dictation" "$ROOT/macos/launcher.c"
-sed "s/@VERSION@/$VERSION/g" "$ROOT/macos/Info.plist" > "$APP/Contents/Info.plist"
-printf '%s\n' "$ROOT" > "$APP/Contents/Resources/project_root"
-if [[ ! -f "$ROOT/build/AppIcon.icns" || "$ROOT/macos/make_icon.py" -nt "$ROOT/build/AppIcon.icns" ]]; then
-  "$ROOT/.venv/bin/python" "$ROOT/macos/make_icon.py" "$ROOT/build/AppIcon.icns"
+PY="$ROOT/.venv/bin/python"
+[[ -x "$PY" ]] || { echo "Run ./setup.sh first." >&2; exit 1; }
+PYTHONPATH="$ROOT" "$PY" -c 'import silentdict.cli as c, sys; m = c.check_models(); sys.exit("Missing models: " + ", ".join(m) + ". Run ./setup.sh." if m else 0)'
+
+APP_NAME="Silent Dictation"
+BUNDLE_ID="io.github.kewang0622.silentdictation"
+SUPPORT="$HOME/Library/Application Support/$APP_NAME"
+RUNTIME="${SILENTDICT_RUNTIME:-$SUPPORT/runtime}"
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+DEST_DIR=/Applications
+[[ -w "$DEST_DIR" ]] || { DEST_DIR="$HOME/Applications"; mkdir -p "$DEST_DIR"; }
+DEST="$DEST_DIR/$APP_NAME.app"
+
+VERSION="$(PYTHONPATH="$ROOT" "$PY" -c 'import silentdict; print(silentdict.__version__)')"
+PYHOME="$(dirname "$(sed -n 's/^home = //p' "$ROOT/.venv/pyvenv.cfg")")"
+PYVER="$("$PY" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+[[ -f "$PYHOME/include/python$PYVER/Python.h" ]] || { echo "Python headers not found in $PYHOME" >&2; exit 1; }
+
+# Stop a running copy (the app, or an older python-based build).
+if pgrep -x "$APP_NAME" >/dev/null || pgrep -f "silentdict.mac" >/dev/null; then
+  echo "Quitting the running app…"
+  osascript -e "tell application id \"$BUNDLE_ID\" to quit" >/dev/null 2>&1 || true
+  for _ in $(seq 1 30); do
+    pgrep -x "$APP_NAME" >/dev/null || pgrep -f "silentdict.mac" >/dev/null || break
+    sleep 0.2
+  done
+  pkill -x "$APP_NAME" 2>/dev/null || true
+  pkill -f "silentdict.mac" 2>/dev/null || true
 fi
-cp "$ROOT/build/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
-codesign --force --sign - --identifier io.github.kewang0622.silentdictation "$APP" >/dev/null
-echo "Built $APP"
 
-if [[ $INSTALL -eq 1 ]]; then
-  DEST="/Applications/Silent Dictation.app"
+# 1) runtime: code always, models and environment cloned once then kept in sync
+echo "Syncing runtime → $RUNTIME"
+mkdir -p "$RUNTIME"
+rsync -a --delete --exclude __pycache__ --exclude '*.pyc' \
+  "$ROOT/silentdict" "$ROOT/third_party" "$ROOT/prompts" "$ROOT/LICENSE" "$ROOT/NOTICE" "$RUNTIME/"
+for dir in models .venv; do
+  if [[ ! -d "$RUNTIME/$dir" ]]; then
+    cp -cR "$ROOT/$dir" "$RUNTIME/$dir" 2>/dev/null || cp -R "$ROOT/$dir" "$RUNTIME/$dir"
+  else
+    rsync -a --delete --exclude __pycache__ "$ROOT/$dir/" "$RUNTIME/$dir/"
+  fi
+done
+
+# Load every native library once now: macOS checks new library files the first time they are opened,
+# which can take minutes for PyTorch and OpenCV. Doing it here keeps the app's first launch quick.
+echo "Preparing the runtime (the first time can take a few minutes)…"
+PYTHONPATH="$RUNTIME" "$RUNTIME/.venv/bin/python" -c 'import torch, cv2, mediapipe, sentencepiece, AppKit, WebKit, AVFoundation, Quartz'
+"$RUNTIME/.venv/bin/python" -m compileall -q "$RUNTIME/silentdict" "$RUNTIME/third_party" >/dev/null || true
+
+# 2) personal data from older versions that kept it in the source folder
+if [[ -d "$ROOT/data" && ! -d "$SUPPORT/data" ]]; then
+  echo "Moving your calibration data to $SUPPORT/data"
+  cp -cR "$ROOT/data" "$SUPPORT/data" 2>/dev/null || cp -R "$ROOT/data" "$SUPPORT/data"
+  rm -f "$SUPPORT/data/app.lock"
+fi
+
+# 3) app bundle, rebuilt only when its inputs change
+STAMP="$(cat "$ROOT/macos/launcher.c" "$ROOT/macos/Info.plist" "$ROOT/macos/AppIcon.icns" | shasum -a 256 | cut -c1-16)-$PYHOME"
+if [[ $FORCE -eq 0 && -f "$DEST/Contents/Resources/build-stamp" && "$(cat "$DEST/Contents/Resources/build-stamp")" == "$STAMP" ]]; then
+  echo "App is up to date: $DEST"
+else
+  TMP="$(mktemp -d)"
+  APP="$TMP/$APP_NAME.app"
+  mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+  clang -O2 -Wall -mmacosx-version-min=13.0 -I"$PYHOME/include/python$PYVER" -L"$PYHOME/lib" \
+    -lpython"$PYVER" -Wl,-rpath,"$PYHOME/lib" -o "$APP/Contents/MacOS/$APP_NAME" "$ROOT/macos/launcher.c"
+  sed "s/@VERSION@/$VERSION/g" "$ROOT/macos/Info.plist" > "$APP/Contents/Info.plist"
+  cp "$ROOT/macos/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+  printf '%s\n' "$STAMP" > "$APP/Contents/Resources/build-stamp"
+  codesign --force --sign - --identifier "$BUNDLE_ID" "$APP" >/dev/null 2>&1 || { echo "codesign failed" >&2; exit 1; }
   if [[ -d "$DEST" ]]; then
+    "$LSREGISTER" -u "$DEST" >/dev/null 2>&1 || true
     if command -v trash >/dev/null; then trash "$DEST"; else rm -rf "$DEST"; fi
+    echo "Rebuilt the app. macOS treats it as new: allow Camera, Input Monitoring and Accessibility again."
   fi
   ditto "$APP" "$DEST"
+  rm -rf "$TMP"
   echo "Installed $DEST"
+fi
+"$LSREGISTER" -f "$DEST" >/dev/null 2>&1 || true
+
+# 4) remove the old in-repo build so Spotlight and the Dock only know the installed app
+if [[ -d "$ROOT/build/$APP_NAME.app" ]]; then
+  "$LSREGISTER" -u "$ROOT/build/$APP_NAME.app" >/dev/null 2>&1 || true
+  if command -v trash >/dev/null; then trash "$ROOT/build"; else rm -rf "$ROOT/build"; fi
+fi
+
+if [[ $OPEN -eq 1 ]]; then
+  open "$DEST"
+  echo "Opened $APP_NAME. Logs: $SUPPORT/data/app.log"
 fi

@@ -1,11 +1,16 @@
 """Camera capture with per-frame face tracking, push-to-talk segments and pre/post roll."""
 from __future__ import annotations
 
+import os
 import threading
 import time
 from collections import deque
 from dataclasses import dataclass
 from typing import Callable
+
+# The app asks for camera permission itself on the main thread; OpenCV's own request cannot
+# work from the capture thread and only produces confusing log noise.
+os.environ.setdefault("OPENCV_AVFOUNDATION_SKIP_AUTH", "1")
 
 import cv2
 import numpy as np
@@ -30,9 +35,9 @@ def to_work_size(bgr: np.ndarray, width: int = WORK_WIDTH) -> np.ndarray:
     return cv2.resize(bgr, (width, int(round(h * width / w))), interpolation=cv2.INTER_AREA)
 
 
-def make_frame(bgr: np.ndarray, ts: float, tracker: FaceTracker) -> Frame:
+def make_frame(bgr: np.ndarray, ts: float, tracker: FaceTracker, track: bool = True) -> Frame:
     small = to_work_size(bgr)
-    obs = tracker(cv2.cvtColor(small, cv2.COLOR_BGR2RGB), ts * 1000.0)
+    obs = tracker(cv2.cvtColor(small, cv2.COLOR_BGR2RGB), ts * 1000.0) if track else None
     return Frame(ts, small, cv2.cvtColor(small, cv2.COLOR_BGR2GRAY), obs)
 
 
@@ -80,6 +85,17 @@ class CameraEngine(threading.Thread):
         self.error: str | None = None
         self.measured_fps = 0.0
         self.ready = threading.Event()
+        self.full_rate = False      # track every frame (set while a live preview is shown)
+        self.idle_every = 3         # otherwise track every 3rd frame when not recording (saves CPU)
+        self.last_obs = None
+        self.last_obs_ts = 0.0
+        # demos and tests: replay the video file from its first frame whenever recording starts
+        self.rewind = isinstance(camera_index, str) and bool(os.environ.get("SILENTDICT_FAKE_REWIND"))
+        self._rewind_now = False
+
+    def recent_obs(self, n: int) -> list:
+        with self.lock:
+            return [f.obs for f in list(self.ring)[-n:]]
 
     @property
     def recording(self) -> bool:
@@ -88,8 +104,9 @@ class CameraEngine(threading.Thread):
     def start_segment(self):
         with self.lock:
             now = time.monotonic()
-            self.segment = [f for f in self.ring if f.ts >= now - self.preroll]
+            self.segment = [] if self.rewind else [f for f in self.ring if f.ts >= now - self.preroll]
             self.stop_at = None
+            self._rewind_now = self.rewind
 
     def set_max_seconds(self, seconds: float):
         self.max_seconds = seconds
@@ -112,8 +129,7 @@ class CameraEngine(threading.Thread):
         else:
             cap = cv2.VideoCapture(self.camera_index, cv2.CAP_AVFOUNDATION)
         if not cap.isOpened():
-            self.error = ("Cannot open the camera. Allow camera access for this terminal in "
-                          "System Settings > Privacy & Security > Camera, then restart it.")
+            self.error = "Can't open this camera. Check System Settings > Privacy & Security > Camera."
             self.ready.set()
             return
         if not replay:
@@ -124,8 +140,13 @@ class CameraEngine(threading.Thread):
         stamps: deque[float] = deque(maxlen=30)
         self.ready.set()
         next_due = time.monotonic()
+        count = 0
         try:
             while self.running:
+                if self._rewind_now:
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    self._rewind_now = False
+                    next_due = time.monotonic()
                 ok, bgr = cap.read()
                 if not ok:
                     if replay:
@@ -133,11 +154,17 @@ class CameraEngine(threading.Thread):
                         continue
                     time.sleep(0.01)
                     continue
-                if replay:  # pace playback like a real camera
-                    next_due += 1.0 / file_fps
+                if replay:  # pace playback like a real camera, dropping any backlog instead of fast-forwarding
+                    next_due = max(next_due + 1.0 / file_fps, time.monotonic() - 0.05)
                     time.sleep(max(0.0, next_due - time.monotonic()))
                 ts = time.monotonic()
-                frame = make_frame(bgr, ts, tracker)
+                count += 1
+                track = self.segment is not None or self.full_rate or count % self.idle_every == 0
+                frame = make_frame(bgr, ts, tracker, track)
+                if frame.obs is not None:
+                    self.last_obs, self.last_obs_ts = frame.obs, ts
+                elif track:
+                    self.last_obs = None
                 stamps.append(ts)
                 if len(stamps) > 1:
                     self.measured_fps = (len(stamps) - 1) / (stamps[-1] - stamps[0])

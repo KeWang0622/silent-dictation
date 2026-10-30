@@ -15,6 +15,10 @@ from .text import normalize
 VAL_EVERY = 5  # every 5th clip is held out, permanently, to measure real progress
 
 
+class NotEnoughData(Exception):
+    """Too few personal sentences to train or evaluate."""
+
+
 @dataclass
 class Item:
     id: str
@@ -79,17 +83,35 @@ def recorded_texts() -> set[str]:
     return {it.text for it in load_items()}
 
 
+def _prompt_file(name: str) -> list[str]:
+    p = paths.ROOT / "prompts" / name
+    if not p.exists():
+        return []
+    return [s.strip() for s in p.read_text().splitlines() if s.strip() and not s.strip().startswith("#")]
+
+
 def load_prompts(count: int, skip_recorded: bool = True) -> list[str]:
+    """Your own phrases first, then everyday dictation interleaved with phonetically balanced
+    Harvard sentences (3:2), skipping anything already recorded."""
     seen = recorded_texts() if skip_recorded else set()
+    custom = _prompt_file("custom.txt")
+    if paths.PERSONAL_CONTEXT.parent.exists():
+        user_custom = paths.PERSONAL / "custom_prompts.txt"
+        if user_custom.exists():
+            custom = [s.strip() for s in user_custom.read_text().splitlines() if s.strip()] + custom
+    dictation, harvard = _prompt_file("calibration_en.txt"), _prompt_file("harvard.txt")
+    mixed = []
+    while dictation or harvard:
+        for _ in range(3):
+            if dictation:
+                mixed.append(dictation.pop(0))
+        for _ in range(2):
+            if harvard:
+                mixed.append(harvard.pop(0))
     out = []
-    for name in ("custom.txt", "calibration_en.txt"):
-        p = paths.ROOT / "prompts" / name
-        if not p.exists():
-            continue
-        for line in p.read_text().splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and normalize(line) not in seen and line not in out:
-                out.append(line)
+    for line in custom + mixed:
+        if normalize(line) not in seen and line not in out:
+            out.append(line)
     return out[:count]
 
 

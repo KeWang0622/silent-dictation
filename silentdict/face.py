@@ -7,11 +7,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import mediapipe as mp
-import numpy as np
-from mediapipe.tasks.python import BaseOptions, vision
+import os
 
-from . import paths
+os.environ.setdefault("GLOG_minloglevel", "2")
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+
+import mediapipe as mp  # noqa: E402
+import numpy as np  # noqa: E402
+from mediapipe.tasks.python import BaseOptions, vision  # noqa: E402
+
+from . import paths  # noqa: E402
 
 # Face-mesh indices that correspond to the iBUG-68 groups used by the reference mean face.
 EYE_A = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]

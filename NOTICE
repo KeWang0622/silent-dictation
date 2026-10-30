@@ -22,6 +22,9 @@ Included source code
   silentdict/roi.py
     Re-implementation of the Auto-AVSR / Chaplin mouth-cropping procedure for MediaPipe 1.x landmarks.
   The real-time push-to-talk + LLM correction design follows Chaplin (MIT).
+  prompts/harvard.txt
+    Harvard sentences, lists 1-7, from the IEEE Recommended Practice for Speech Quality Measurements
+    (1969), in the public domain.
 
 Models downloaded by setup.sh (not included in this repository)
   Auto-AVSR visual speech recognition model trained on LRS3 (LRS3_V_WER19.1) and its subword language

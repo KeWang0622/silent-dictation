@@ -5,12 +5,15 @@ thread (before the capture thread starts) through AVFoundation.
 """
 from __future__ import annotations
 
+import os
 import time
 
 STATUS = {0: "not determined", 1: "restricted", 2: "denied", 3: "authorized"}
 
 
 def camera_status() -> int:
+    if os.environ.get("SILENTDICT_FAKE_CAMERA"):  # a video file stands in for the camera (tests, demos)
+        return 3
     from AVFoundation import AVCaptureDevice, AVMediaTypeVideo
 
     return int(AVCaptureDevice.authorizationStatusForMediaType_(AVMediaTypeVideo))
@@ -33,10 +36,6 @@ def ensure_camera_access(timeout: float = 120.0) -> bool:
     while "granted" not in answer and time.time() < end:
         NSRunLoop.currentRunLoop().runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(0.1))
     return answer.get("granted", False)
-
-
-CAMERA_HELP = ("Camera access is off for the app running this command. Enable it in System Settings > "
-               "Privacy & Security > Camera (for Terminal, iTerm, VS Code...), then restart that app.")
 
 
 def request_camera_async(callback):

@@ -1,0 +1,22 @@
+name: Accuracy report
+description: Share how well lip reading works for you (helps everyone tune the defaults)
+labels: [accuracy]
+body:
+  - type: markdown
+    attributes:
+      value: Please don't attach video of your face. Numbers and settings are enough.
+  - type: input
+    id: sentences
+    attributes:
+      label: Calibration sentences recorded
+      placeholder: "60"
+  - type: input
+    id: accuracy
+    attributes:
+      label: Accuracy before → after calibration (from the Calibrate page)
+      placeholder: 61% → 78%
+  - type: textarea
+    id: setup
+    attributes:
+      label: Setup
+      description: Camera, lighting, distance, glasses or facial hair, mode (Fast/Balanced/Accurate), AI clean-up on or off.

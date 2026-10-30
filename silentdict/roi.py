@@ -85,8 +85,15 @@ class MouthCropper:
         return out
 
 
-def frames_to_roi(frames, cropper: MouthCropper, fps: float = 25.0, min_face_ratio: float = 0.5):
-    """frames: objects with .ts, .gray and .obs. Returns uint8 (T, 96, 96)."""
+def frames_to_roi(frames, cropper: MouthCropper, fps: float = 25.0, min_face_ratio: float = 0.5,
+                  trim: bool = True):
+    """frames: objects with .ts, .gray and .obs. Returns uint8 (T, 96, 96).
+
+    With trim, leading/trailing stretches without lip movement are dropped (keeping a margin), so the
+    recogniser does not invent words for the moments before and after you mouth the sentence.
+    """
+    from .activity import active_span
+
     if not frames:
         raise ValueError("empty clip")
     found = sum(1 for f in frames if f.obs is not None)
@@ -94,4 +101,7 @@ def frames_to_roi(frames, cropper: MouthCropper, fps: float = 25.0, min_face_rat
         raise ValueError(f"face visible in only {found}/{len(frames)} frames")
     idx = resample_indices([f.ts for f in frames], fps)
     chosen = [frames[i] for i in idx]
+    if trim:
+        start, end = active_span([f.obs for f in chosen])
+        chosen = chosen[start:end]
     return cropper([f.gray for f in chosen], [f.obs.points if f.obs is not None else None for f in chosen])

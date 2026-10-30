@@ -6,3 +6,5 @@ __pycache__/
 *.pyc
 *.part
 .DS_Store
+.pytest_cache/
+.ruff_cache/

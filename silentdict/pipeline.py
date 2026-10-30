@@ -7,8 +7,12 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .roi import MouthCropper, frames_to_roi
-from .text import sentence_case
+from .text import accept_rewrite, sentence_case
 from .vsr import Hypothesis, LipReader
+
+# Only candidates whose beam score is within this margin of the best one are offered to the LLM,
+# so it cannot overrule a confident lip-reading result with a less likely candidate.
+LLM_SCORE_MARGIN = 2.5
 
 
 @dataclass
@@ -50,7 +54,10 @@ class Recognizer:
             return res
         t = time.perf_counter()
         if rewrite and self.rewriter is not None:
-            res.text = self.rewriter([h.text for h in res.hyps], context=self.context[-3:])
+            top = res.hyps[0].score
+            offered = [h.text for h in res.hyps if h.score >= top - LLM_SCORE_MARGIN]
+            candidate = self.rewriter(offered, context=self.context[-3:])
+            res.text = candidate if accept_rewrite(candidate, offered) else sentence_case(res.raw)
             res.timings["llm"] = time.perf_counter() - t
         else:
             res.text = sentence_case(res.raw)
