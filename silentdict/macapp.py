@@ -821,7 +821,12 @@ class AppDelegate(NSObject):
 
         status = {"loading": T("正在加载模型…", "Loading models..."), "training": T("正在训练个人模型…", "Training personal model..."),
                   "error": c.message, "listening": T("读唇中…", "Reading lips..."), "decoding": T("识别中…", "Decoding...")}
-        item(status.get(c.state, c.ready_message() if c.recognizer else c.message))
+        if c.recognizer is not None:
+            personal = c.recognizer.reader.personalized
+            llm_on = c.recognizer.rewriter is not None
+            status["ready"] = T(f"就绪 · {'个人模型' if personal else '原始模型'} · 语言模型修正{'开' if llm_on else '关'}",
+                                f"Ready · {'personal' if personal else 'base'} model · LLM {'on' if llm_on else 'off'}")
+        item(status.get(c.state, c.message))
         k = key_label(s)
         if c.hotkey_error:
             item(T("⚠️ 按键不可用：需要输入监控权限", "⚠️ Key inactive: Input Monitoring needed"), self.open_setup)
