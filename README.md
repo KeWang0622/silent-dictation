@@ -11,6 +11,10 @@
 </p>
 
 <p align="center">
+  Inspired by <a href="https://x.com/AarushYadav47/status/2116198463847408066">@AarushYadav47's Subvocal</a> · not affiliated
+</p>
+
+<p align="center">
   <a href="https://github.com/KeWang0622/silent-dictation/actions/workflows/ci.yml"><img src="https://github.com/KeWang0622/silent-dictation/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-black?logo=apple" alt="macOS 13+">
   <img src="https://img.shields.io/badge/Apple%20Silicon-M1%E2%80%93M5-6246ea" alt="Apple Silicon">
@@ -24,7 +28,9 @@
 
 Voice dictation apps like Willow Voice and Wispr Flow are fast, but they need you to talk out loud, which doesn't work in a library, an open office or on a train. Silent Dictation works the same way (hold a key, speak, release) except you don't make a sound: it reads your lips through the camera you already have and types what you mouthed into any app.
 
-> **Inspiration.** This project started after seeing [Aarush Yadav's Subvocal announcement](https://x.com/AarushYadav47/status/2116198463847408066) (YC F26): glasses that read silent speech with non-contact sensing. I wanted to see how far a plain Mac camera and open lip-reading models can go today, with nothing to wear. Silent Dictation is an independent open-source project and is **not affiliated with Subvocal**.
+> **Inspiration.** This project started after seeing [Aarush Yadav's (@AarushYadav47) Subvocal announcement](https://x.com/AarushYadav47/status/2116198463847408066) (YC F26): glasses that read silent speech with non-contact sensing. I often sneak into an empty room at the office just to dictate, and I already wear glasses, so I wanted to see how far a plain Mac camera and open lip-reading models can go today, with nothing extra to wear. Silent Dictation is an independent open-source project and is **not affiliated with Subvocal**.
+
+> **Status: early experiment.** Everything works end to end on your Mac, including calibration and training a personal model, but accuracy is still low. With default settings the base model gets roughly half of the words wrong (47.5% word error rate on 120 read sentences from 12 speakers in the public VidTIMIT dataset), and silent mouthing is harder than speaking aloud. Calibration helps, and the [roadmap](#roadmap) lists the next steps. Ideas and pull requests are very welcome.
 
 ## Highlights
 
