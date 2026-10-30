@@ -1,6 +1,7 @@
 .venv/
 models/
 data/
+build/
 __pycache__/
 *.pyc
 *.part

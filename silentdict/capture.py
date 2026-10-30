@@ -91,6 +91,9 @@ class CameraEngine(threading.Thread):
             self.segment = [f for f in self.ring if f.ts >= now - self.preroll]
             self.stop_at = None
 
+    def set_max_seconds(self, seconds: float):
+        self.max_seconds = seconds
+
     def stop_segment(self):
         with self.lock:
             if self.segment is not None and self.stop_at is None:

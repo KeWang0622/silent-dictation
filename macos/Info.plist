@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>Silent Dictation</string>
+  <key>CFBundleDisplayName</key><string>Silent Dictation</string>
+  <key>CFBundleIdentifier</key><string>io.github.kewang0622.silentdictation</string>
+  <key>CFBundleExecutable</key><string>Silent Dictation</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>@VERSION@</string>
+  <key>CFBundleVersion</key><string>@VERSION@</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>LSUIElement</key><true/>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSCameraUsageDescription</key>
+  <string>Silent Dictation reads your lip movements to type what you silently mouth. Video is processed on this Mac and never uploaded.</string>
+</dict>
+</plist>

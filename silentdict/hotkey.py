@@ -52,6 +52,8 @@ class PushToTalk(threading.Thread):
         self.down = False
         self.chorded = False
         self.pressed_at = 0.0
+        self.last_hold = 0.0  # seconds the key was held on the latest release
+        self.last_chorded = False  # another key was typed while it was held
         self.error: str | None = None
         self.started = threading.Event()
         self._tap = None
@@ -72,7 +74,9 @@ class PushToTalk(threading.Thread):
                     self._safe(self.on_press)
                 elif not is_down and self.down:
                     self.down = False
-                    short = time.monotonic() - self.pressed_at < self.min_hold
+                    self.last_hold = time.monotonic() - self.pressed_at
+                    self.last_chorded = self.chorded
+                    short = self.last_hold < self.min_hold
                     self._safe(self.on_release, self.chorded or short)
         return event
 

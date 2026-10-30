@@ -37,3 +37,19 @@ def ensure_camera_access(timeout: float = 120.0) -> bool:
 
 CAMERA_HELP = ("Camera access is off for the app running this command. Enable it in System Settings > "
                "Privacy & Security > Camera (for Terminal, iTerm, VS Code...), then restart that app.")
+
+
+def request_camera_async(callback):
+    """Show the system camera prompt without blocking the UI; callback(granted) runs on some thread."""
+    from AVFoundation import AVCaptureDevice, AVMediaTypeVideo
+
+    AVCaptureDevice.requestAccessForMediaType_completionHandler_(
+        AVMediaTypeVideo, lambda granted: callback(bool(granted)))
+
+
+SETTINGS_URLS = {
+    "camera": "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera",
+    "input": "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
+    "accessibility": "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+    "keyboard": "x-apple.systempreferences:com.apple.Keyboard-Settings.extension",
+}

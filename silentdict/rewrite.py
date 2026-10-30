@@ -69,10 +69,11 @@ class Rewriter:
                                  max_tokens=self.max_tokens, verbose=False)
         out = re.sub(r"<think>.*?</think>", "", out, flags=re.S).strip().splitlines()
         text = out[0].strip().strip('"').strip() if out else ""
-        # Guard against the model wandering off: fall back to the recogniser's best guess.
+        # Guard against the model adding or dropping content: fall back to the recogniser's best guess.
         n_best = len(normalize(candidates[0]).split())
         n_out = len(normalize(text).split())
-        if not text or n_out > 2 * n_best + 3 or n_out < max(1, n_best // 2 - 1):
+        slack = max(1, n_best // 4)
+        if not text or n_out > n_best + slack or n_out < max(1, n_best - slack - 1):
             return sentence_case(candidates[0])
         if text.isupper():
             text = sentence_case(text)

@@ -67,3 +67,9 @@ def paste_text(text: str, restore_after: float = 0.6):
     _cmd_v()
     if restore_after is not None:
         threading.Timer(restore_after, _restore, args=(pb, saved, count)).start()
+
+
+def copy_text(text: str):
+    pb = NSPasteboard.generalPasteboard()
+    pb.clearContents()
+    pb.setString_forType_(text, "public.utf8-plain-text")

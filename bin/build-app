@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Build "Silent Dictation.app" for this checkout. Usage: bin/build-app [--install]
+#   --install   also copy the app to /Applications (so it shows up in Spotlight and Launchpad)
+# The app runs the code and models in this folder, so keep the folder where it is.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+APP="$ROOT/build/Silent Dictation.app"
+INSTALL=0
+[[ "${1:-}" == "--install" ]] && INSTALL=1
+[[ -x "$ROOT/.venv/bin/python" ]] || { echo "Run ./setup.sh first." >&2; exit 1; }
+VERSION="$(PYTHONPATH="$ROOT" "$ROOT/.venv/bin/python" -c 'import silentdict; print(silentdict.__version__)')"
+
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+clang -O2 -Wall -mmacosx-version-min=13.0 -o "$APP/Contents/MacOS/Silent Dictation" "$ROOT/macos/launcher.c"
+sed "s/@VERSION@/$VERSION/g" "$ROOT/macos/Info.plist" > "$APP/Contents/Info.plist"
+printf '%s\n' "$ROOT" > "$APP/Contents/Resources/project_root"
+if [[ ! -f "$ROOT/build/AppIcon.icns" || "$ROOT/macos/make_icon.py" -nt "$ROOT/build/AppIcon.icns" ]]; then
+  "$ROOT/.venv/bin/python" "$ROOT/macos/make_icon.py" "$ROOT/build/AppIcon.icns"
+fi
+cp "$ROOT/build/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+codesign --force --sign - --identifier io.github.kewang0622.silentdictation "$APP" >/dev/null
+echo "Built $APP"
+
+if [[ $INSTALL -eq 1 ]]; then
+  DEST="/Applications/Silent Dictation.app"
+  if [[ -d "$DEST" ]]; then
+    if command -v trash >/dev/null; then trash "$DEST"; else rm -rf "$DEST"; fi
+  fi
+  ditto "$APP" "$DEST"
+  echo "Installed $DEST"
+fi
