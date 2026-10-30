@@ -108,6 +108,11 @@ if [[ -d "$ROOT/build/$APP_NAME.app" ]]; then
   if command -v trash >/dev/null; then trash "$ROOT/build"; else rm -rf "$ROOT/build"; fi
 fi
 
+# Copies moved to the Trash get registered again by macOS; forget them so the app's name opens the installed copy.
+sleep 1
+"$LSREGISTER" -dump 2>/dev/null | sed -n "s|^path: *\(.*/\.Trash/.*$APP_NAME\.app\) (0x[0-9a-f]*)\$|\1|p" |
+  while IFS= read -r stale; do "$LSREGISTER" -u "$stale" >/dev/null 2>&1 || true; done
+
 if [[ $OPEN -eq 1 ]]; then
   open "$DEST"
   echo "Opened $APP_NAME. Logs: $SUPPORT/data/app.log"
