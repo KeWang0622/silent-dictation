@@ -105,6 +105,7 @@ On an Apple M5 Max with macOS 26:
 | Latency for a typical 3 s sentence | about 1 s on an idle machine, plus about 0.3 s for the LLM |
 | Personal fine-tuning sanity check | model learns a new target sentence for a clip; loss 87 → 5.8 |
 | Live camera smoke test | 30 fps capture, face found in 70 of 76 frames, crop and decode completed |
+| Fresh clone + `./setup.sh` | all model checksums verified; `doctor` and `transcribe` pass |
 
 Your silent-speech accuracy is not known until you calibrate; the calibration report gives that number.
 
