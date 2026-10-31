@@ -27,10 +27,11 @@ from WebKit import WKWebView, WKWebViewConfiguration
 
 from .. import CREDITS, __version__, devices, paths, stats
 from .. import settings as settings_mod
-from ..dataset import add_item, load_items, mark_reviewed
+from ..dataset import add_item, history_clip, load_items, mark_reviewed
 from ..hotkey import input_monitoring_allowed
 from ..output import accessibility_allowed, copy_text
 from ..permissions import SETTINGS_URLS, camera_status, request_camera_async
+from ..pipeline import available_models
 from .overlay import Overlay
 
 WEB = Path(__file__).with_name("web")
@@ -467,7 +468,9 @@ class AppDelegate(NSObject):
             "state": c.state, "message": c.message, "handsFree": c.hands_free, "keyDown": c.key_down,
             "hotkeyError": bool(c.hotkey_error),
             "personal": bool(reader and reader.personalized),
-            "llmActive": bool(c.recognizer and c.recognizer.rewriter), "llmAvailable": c.llm_available,
+            "llmActive": bool(c.recognizer and c.recognizer.rescorer), "llmAvailable": c.llm_available,
+            "model": c.recognizer.model if c.recognizer else c.model(),
+            "models": self.cached("models", 30.0, available_models),
             "cameraOn": c.camera is not None, "cameraProblem": c.camera_problem(),
             "permissions": perms,
             "settings": {**s, "login": LOGIN_AGENT.exists(), "keyLabel": KEY_LABELS.get(s.get("key", "fn"), "fn")},
@@ -586,7 +589,7 @@ class AppDelegate(NSObject):
             c.restart_camera()
         elif key == "camera_policy" and value == "always" and camera_status() == 3:
             c.ensure_camera()
-        elif key in ("mode", "llm"):
+        elif key in ("mode", "llm", "model"):
             c.reload_models()
         elif key == "onboarded":
             pass
@@ -606,12 +609,11 @@ class AppDelegate(NSObject):
 
     @objc.python_method
     def review_save(self, hid, text):
-        import numpy as np
         text = text.strip()
         f = paths.HISTORY / f"{hid}.npz"
         if text and f.exists():
             entry = json.loads((paths.HISTORY / f"{hid}.json").read_text())
-            add_item(np.load(f)["roi"], text, "review", meta={"read": entry["text"], "raw": entry["raw"]})
+            add_item(history_clip(hid), text, "review", meta={"read": entry["text"], "raw": entry["raw"]})
         mark_reviewed(hid)
         self.invalidate("recent", "clips")
 

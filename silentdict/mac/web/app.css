@@ -98,8 +98,8 @@ h4 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacin
   font-weight: 600; font-size: .92em; line-height: 1.5; }
 
 /* segmented + select + switch */
-.seg { display: inline-flex; background: var(--bg2); border-radius: 9px; padding: 3px; gap: 2px; }
-.seg button { border: 0; background: transparent; height: 26px; padding: 0 12px; border-radius: 7px; font-weight: 550; color: var(--text2); }
+.seg { display: inline-flex; flex-shrink: 0; background: var(--bg2); border-radius: 9px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; height: 26px; padding: 0 12px; border-radius: 7px; font-weight: 550; color: var(--text2); white-space: nowrap; }
 .seg button.on { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
 .seg.small button { height: 24px; }
 .select { height: 30px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text);

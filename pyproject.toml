@@ -1,6 +1,6 @@
 [project]
 name = "silent-dictation"
-version = "0.2.0"
+version = "0.3.0"
 description = "Local, camera-based silent dictation for macOS (visual speech recognition)."
 requires-python = ">=3.11,<3.14"
 dependencies = [

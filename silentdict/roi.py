@@ -1,6 +1,7 @@
 """Mouth region-of-interest extraction compatible with Auto-AVSR / Chaplin preprocessing."""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
@@ -83,6 +84,55 @@ class MouthCropper:
             y0 = int(round(cy))
             out[i] = padded[y0: y0 + CROP, x0: x0 + CROP]
         return out
+
+
+FACE_SCALE = 1.6  # face crop side relative to the landmark box; matches LRS3-style framing best on our benchmark
+
+
+@dataclass
+class Clip:
+    """What the lip readers see: grey 96x96 mouth crops and (for FLARE) matching 96x96 face crops."""
+    lip: np.ndarray
+    face: np.ndarray | None = None
+
+    def __len__(self):
+        return len(self.lip)
+
+
+def face_crops(frames, scale: float = FACE_SCALE, size: int = CROP) -> np.ndarray:
+    """Square grey crops around the face (box smoothed over ~0.36 s so the crop does not jitter)."""
+    boxes = [None if f.obs is None else f.obs.bbox for f in frames]
+    valid = [b for b in boxes if b is not None]
+    if not valid:
+        raise ValueError("no face found in this clip")
+    arr = np.array([((b[0] + b[2]) / 2, (b[1] + b[3]) / 2, max(b[2] - b[0], b[3] - b[1]))
+                    for b in (b if b is not None else valid[0] for b in boxes)], dtype=np.float64)
+    pad = np.pad(arr, ((4, 4), (0, 0)), mode="edge")
+    arr = np.stack([np.convolve(pad[:, i], np.ones(9) / 9, mode="valid") for i in range(3)], 1)
+    out = np.empty((len(frames), size, size), np.uint8)
+    for i, (f, (cx, cy, side)) in enumerate(zip(frames, arr)):
+        k = size / (side * scale)
+        M = np.array([[k, 0, size / 2 - cx * k], [0, k, size / 2 - cy * k]], dtype=np.float32)
+        out[i] = cv2.warpAffine(f.gray, M, (size, size), flags=cv2.INTER_AREA, borderMode=cv2.BORDER_REPLICATE)
+    return out
+
+
+def frames_to_clip(frames, cropper: MouthCropper, fps: float = 25.0, min_face_ratio: float = 0.5,
+                   trim: bool = True, face: bool = True) -> Clip:
+    """Mouth (and face) crops on a 25 fps grid, with the still parts at the start and end trimmed."""
+    from .activity import active_span
+
+    if not frames:
+        raise ValueError("empty clip")
+    found = sum(1 for f in frames if f.obs is not None)
+    if found / len(frames) < min_face_ratio:
+        raise ValueError(f"face visible in only {found}/{len(frames)} frames")
+    chosen = [frames[i] for i in resample_indices([f.ts for f in frames], fps)]
+    if trim:
+        start, end = active_span([f.obs for f in chosen])
+        chosen = chosen[start:end]
+    lip = cropper([f.gray for f in chosen], [f.obs.points if f.obs is not None else None for f in chosen])
+    return Clip(lip, face_crops(chosen) if face else None)
 
 
 def frames_to_roi(frames, cropper: MouthCropper, fps: float = 25.0, min_face_ratio: float = 0.5,

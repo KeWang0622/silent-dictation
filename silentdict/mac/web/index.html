@@ -240,9 +240,11 @@
 
     <div class="group"><h4>Recognition</h4>
       <div class="card list">
+        <div class="lrow"><div><b>Lip-reading model</b><span id="modelHelp">—</span></div>
+          <div class="seg" data-setting="model" id="modelSeg"><button data-value="auto">Auto</button><button data-value="flare">FLARE</button><button data-value="auto_avsr">Auto-AVSR</button></div></div>
         <div class="lrow"><div><b>Mode</b><span id="modeHelp">Balanced speed and accuracy</span></div>
           <div class="seg" data-setting="mode"><button data-value="fast">Fast</button><button data-value="balanced">Balanced</button><button data-value="accurate">Accurate</button></div></div>
-        <div class="lrow"><div><b>AI clean-up</b><span id="llmHelp">A small on-device language model fixes look-alike words. Auto turns it on only if calibration shows it helps you.</span></div>
+        <div class="lrow"><div><b>AI clean-up</b><span id="llmHelp">A small on-device language model picks the most natural of the lip reader's guesses.</span></div>
           <div class="seg" data-setting="llm" id="llmSeg"><button data-value="auto">Auto</button><button data-value="on">On</button><button data-value="off">Off</button></div></div>
         <div class="lrow"><div><b>Personal model</b><span id="personalHelp">—</span></div><button class="btn" data-act="go" data-page="calibrate">Calibrate</button></div>
       </div></div>
@@ -262,7 +264,7 @@
         <div>
           <b>Silent Dictation <span id="version"></span></b>
           <span>Open-source, on-device lip reading for macOS. Inspired by <a href="#" data-url="https://x.com/AarushYadav47/status/2116198463847408066">Aarush Yadav's Subvocal</a>; not affiliated.</span>
-          <span>Built on <a href="#" data-url="https://github.com/mpc001/auto_avsr">Auto-AVSR</a>, <a href="#" data-url="https://github.com/amanvirparhar/chaplin">Chaplin</a> and <a href="#" data-url="https://ai.google.dev/edge/mediapipe">MediaPipe</a>. The default lip-reading weights are for non-commercial research use.</span>
+          <span>Built on <a href="#" data-url="https://github.com/jxzhanggg/FLARE">FLARE</a>, <a href="#" data-url="https://github.com/mpc001/auto_avsr">Auto-AVSR</a>, <a href="#" data-url="https://github.com/amanvirparhar/chaplin">Chaplin</a> and <a href="#" data-url="https://ai.google.dev/edge/mediapipe">MediaPipe</a>. The lip-reading weights are for non-commercial use only.</span>
           <div class="row gap"><button class="btn" data-act="openURL" data-url="https://github.com/KeWang0622/silent-dictation">GitHub</button>
             <button class="btn" data-act="openData">Open data folder</button><button class="btn ghost" data-act="quit">Quit</button></div>
         </div>

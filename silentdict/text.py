@@ -65,15 +65,6 @@ def align(ref: str, hyp: str) -> list[dict]:
     return out[::-1]
 
 
-def accept_rewrite(rewritten: str, offered: list[str]) -> bool:
-    """The LLM may pick one of the offered candidates or change at most one word of the best one."""
-    out = normalize(rewritten).split()
-    if any(out == normalize(c).split() for c in offered):
-        return True
-    best = normalize(offered[0]).split()
-    return len(out) == len(best) and edit_distance(out, best) <= 1
-
-
 def sentence_case(text: str) -> str:
     """Fallback formatting when no language model is available."""
     words = text.lower().split()

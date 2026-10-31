@@ -48,6 +48,7 @@ def doctor(args):
     print(f"silentdict {__version__}\n{CREDITS}\n")
     print("models        ", "OK" if not missing else "MISSING " + ", ".join(missing) + " (run ./setup.sh)")
     ok &= not missing
+    print("FLARE model   ", "OK" if paths.FLARE_WEIGHTS.exists() else "not installed (./setup.sh downloads it; falls back to Auto-AVSR)")
     print("local LLM     ", "OK" if paths.LLM_DIR.exists() else "not installed (optional: ./setup.sh --with-llm)")
     print("Apple GPU     ", "OK (MPS)" if torch.backends.mps.is_available() else "not available, using CPU")
     print("data folder   ", paths.DATA)
@@ -120,7 +121,8 @@ def main(argv=None):
     p.add_argument("--device", default="auto", help="auto, mps or cpu")
     p.add_argument("--epochs", type=int, default=None, help="override the epochs of each strategy")
     p.add_argument("--lr", type=float, default=None, help="override the learning rate of each strategy")
-    p.add_argument("--batch-size", type=int, default=6)
+    p.add_argument("--batch-size", type=int, default=4)
+    p.add_argument("--model", default="auto", choices=["auto", "flare", "auto_avsr"], help="lip-reading model")
     p.add_argument("--strategy", choices=["light", "full", "both"], default="both")
     p.add_argument("--min-items", type=int, default=20)
 
@@ -132,9 +134,10 @@ def main(argv=None):
     p.add_argument("--start", type=float, default=0.0, help="seconds")
     p.add_argument("--end", type=float, default=None, help="seconds")
     p.add_argument("--roi", action="store_true", help="the video is already a 96x96 mouth crop")
-    p.add_argument("--llm", action="store_true", help="also apply the optional local LLM clean-up")
+    p.add_argument("--llm", action="store_true", help="re-rank candidates with the optional local language model")
+    p.add_argument("--model", default="auto", choices=["auto", "flare", "auto_avsr"], help="lip-reading model")
     p.add_argument("--base", action="store_true", help="ignore the personal model")
-    p.add_argument("--beam", type=int, default=None, help="beam size (default 20)")
+    p.add_argument("--beam", type=int, default=None, help="beam size (default: 10 for FLARE, 20 for Auto-AVSR)")
     p.add_argument("--device", default="auto")
 
     args = parser.parse_args(argv)
@@ -160,7 +163,7 @@ def main(argv=None):
         strategies = ("light", "full") if args.strategy == "both" else (args.strategy,)
         try:
             train.run(epochs=args.epochs, lr=args.lr, batch_size=args.batch_size, device=args.device,
-                      min_items=args.min_items, strategies=strategies)
+                      min_items=args.min_items, strategies=strategies, model=args.model)
         except NotEnoughData as exc:
             print(exc)
             return 1
@@ -186,12 +189,12 @@ def transcribe(args):
 
     from .pipeline import Recognizer
 
-    rewriter = None
+    rescorer = None
     if args.llm:
-        from .rewrite import Rewriter
-        rewriter = Rewriter()
+        from .rewrite import Rescorer
+        rescorer = Rescorer()
     decode = {"beam_size": args.beam} if args.beam else None
-    rec = Recognizer(rewriter=rewriter, device=args.device, personal=not args.base, decode=decode)
+    rec = Recognizer(rescorer=rescorer, model=args.model, device=args.device, personal=not args.base, decode=decode)
     t0 = time.perf_counter()
     if args.roi:
         cap = cv2.VideoCapture(args.video)
@@ -201,10 +204,10 @@ def transcribe(args):
             if not ok:
                 break
             frames.append(cv2.cvtColor(cv2.resize(f, (96, 96)), cv2.COLOR_BGR2GRAY))
-        res = rec.recognize_roi(np.stack(frames), rewrite=rewriter is not None)
+        res = rec.recognize_clip(np.stack(frames), rescore=rescorer is not None)
     else:
         from .capture import read_video_file
-        res = rec.recognize_frames(read_video_file(args.video, args.start, args.end), rewrite=rewriter is not None)
+        res = rec.recognize_frames(read_video_file(args.video, args.start, args.end), rescore=rescorer is not None)
     if res.error:
         print("error:", res.error)
         return 1

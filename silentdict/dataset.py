@@ -36,6 +36,11 @@ class Item:
     def roi(self) -> np.ndarray:
         return np.load(self.path)["roi"]
 
+    def clip(self):
+        from .roi import Clip
+        data = np.load(self.path)
+        return Clip(data["roi"], data["face"] if "face" in data.files else None)
+
 
 def load_items(split: str | None = None) -> list[Item]:
     if not paths.MANIFEST.exists():
@@ -59,13 +64,23 @@ def _next_split() -> str:
     return "val" if n % VAL_EVERY == VAL_EVERY - 1 else "train"
 
 
-def add_item(roi: np.ndarray, text: str, source: str, meta: dict | None = None,
-             split: str | None = None) -> Item:
+def _arrays(clip) -> dict:
+    """A roi.Clip or a plain lip array -> arrays to store (roi = lip crops, face = face crops if any)."""
+    lip = getattr(clip, "lip", clip)
+    face = getattr(clip, "face", None)
+    out = {"roi": np.asarray(lip).astype(np.uint8)}
+    if face is not None:
+        out["face"] = np.asarray(face).astype(np.uint8)
+    return out
+
+
+def add_item(clip, text: str, source: str, meta: dict | None = None, split: str | None = None) -> Item:
+    roi = getattr(clip, "lip", clip)
     paths.CLIPS.mkdir(parents=True, exist_ok=True)
     item = Item(id=time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:6], text=normalize(text),
                 split=split or _next_split(), source=source, created=time.time(), frames=len(roi),
                 meta=meta or {})
-    np.savez_compressed(item.path, roi=roi.astype(np.uint8))
+    np.savez_compressed(item.path, **_arrays(clip))
     with open(paths.MANIFEST, "a") as f:
         f.write(json.dumps(asdict(item)) + "\n")
     return item
@@ -117,16 +132,22 @@ def load_prompts(count: int, skip_recorded: bool = True) -> list[str]:
 
 # ---------- history of everyday dictation (for review -> training) ----------
 
-def save_history(roi: np.ndarray, raw: str, text: str, nbest: list[str], max_items: int = 500):
+def save_history(clip, raw: str, text: str, nbest: list[str], max_items: int = 500):
     paths.HISTORY.mkdir(parents=True, exist_ok=True)
     hid = time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:6]
-    np.savez_compressed(paths.HISTORY / f"{hid}.npz", roi=roi.astype(np.uint8))
+    np.savez_compressed(paths.HISTORY / f"{hid}.npz", **_arrays(clip))
     (paths.HISTORY / f"{hid}.json").write_text(json.dumps(
         {"id": hid, "raw": raw, "text": text, "nbest": nbest, "created": time.time(), "reviewed": False}))
     entries = sorted(paths.HISTORY.glob("*.json"))
     for old in entries[:-max_items]:
         old.unlink(missing_ok=True)
         old.with_suffix(".npz").unlink(missing_ok=True)
+
+
+def history_clip(hid: str):
+    from .roi import Clip
+    data = np.load(paths.HISTORY / f"{hid}.npz")
+    return Clip(data["roi"], data["face"] if "face" in data.files else None)
 
 
 def history_entries(unreviewed_only: bool = True) -> list[dict]:

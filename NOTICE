@@ -11,6 +11,12 @@ Inspiration
   is not affiliated with or endorsed by Subvocal.
 
 Included source code
+  silentdict/flare/
+    A plain PyTorch port of FLARE (https://github.com/jxzhanggg/FLARE), MIT licence, Copyright (c) 2026
+    Jing-Xuan Zhang; the licence text is in silentdict/flare/LICENSE. model.py re-implements the FLARE
+    encoder and decoder so that it runs without fairseq; convnext.py is copied from FLARE (itself based on
+    ConvNeXt by Meta Platforms, MIT) with one unused import removed; spm_unigram1000.model and dict.wrd.txt
+    are FLARE's tokenizer files, copied unchanged.
   third_party/espnet/
     Derived from ESPnet (https://github.com/espnet/espnet), Apache-2.0, as packaged with the visual
     front-end by Pingchuan Ma / Imperial College London in Auto-AVSR
@@ -26,7 +32,17 @@ Included source code
     Harvard sentences, lists 1-7, from the IEEE Recommended Practice for Speech Quality Measurements
     (1969), in the public domain.
 
+Benchmark
+  benchmarks/vidtimit_refs.json
+    Transcripts of 120 VidTIMIT sentences (Conrad Sanderson, https://conradsanderson.id.au/vidtimit/),
+    which are TIMIT prompt sentences, made with Whisper large-v3-turbo from the dataset's audio. The
+    VidTIMIT videos themselves are not included.
+
 Models downloaded by setup.sh (not included in this repository)
+  FLARE Large (exp_22_2_large, fine-tuned on LRS3) by Jing-Xuan Zhang et al., from
+  https://huggingface.co/Anony94/FLARE-checkpoints at a pinned revision, released under CC BY-NC 4.0
+  (non-commercial use only). setup.sh converts it to a smaller fp16 file; personal models fine-tuned from
+  it inherit its terms.
   Auto-AVSR visual speech recognition model trained on LRS3 (LRS3_V_WER19.1) and its subword language
   model, by Pingchuan Ma et al., mirrored on Hugging Face by Amanvir Parhar. The authors release these
   weights for non-commercial research use; they are not covered by this project's licence, and personal

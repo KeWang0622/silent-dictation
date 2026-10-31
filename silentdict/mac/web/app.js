@@ -208,6 +208,7 @@
     $("#heroTitle").textContent = title;
     $("#heroText").textContent = text;
     const chips = [
+      [S.model === "flare" ? "FLARE" : "Auto-AVSR", "accent"],
       S.personal ? ["Personal model", "ok"] : ["Base model", ""],
       [S.cameraOn ? "Camera on" : "Camera off", S.cameraOn ? "accent" : ""],
       [{ fast: "Fast", balanced: "Balanced", accurate: "Accurate" }[S.settings.mode] || "Balanced", ""],
@@ -374,10 +375,16 @@
     $("#setConflictText").textContent = S.conflicts.join(", ") + " also uses fn. Choose another key or quit it while you're in public.";
     $("#modeHelp").textContent = { fast: "Quickest response, slightly less accurate", balanced: "Balanced speed and accuracy",
       accurate: "Most accurate, a little slower" }[S.settings.mode] || "";
+    const hasFlare = (S.models || []).includes("flare");
+    $$("#modelSeg button").forEach((b) => (b.disabled = b.dataset.value === "flare" && !hasFlare));
+    $("#modelHelp").textContent = !hasFlare
+      ? "Using Auto-AVSR. Run ./setup.sh again to add FLARE, about 30% fewer mistakes."
+      : S.model === "flare" ? "FLARE reads your lips and face: about 30% fewer mistakes than Auto-AVSR"
+      : "Auto-AVSR: smaller and lips only";
     $("#llmSeg").classList.toggle("disabled", !S.llmAvailable);
     $$("#llmSeg button").forEach((b) => (b.disabled = !S.llmAvailable));
     $("#llmHelp").textContent = S.llmAvailable
-      ? "A small on-device language model fixes look-alike words. Auto turns it on only if calibration shows it helps you."
+      ? "A small on-device language model picks the most natural of the lip reader's guesses, such as “five” over “fine”. It never adds words. Auto keeps it on unless calibration shows it doesn't help you."
       : "Optional 2 GB download: run ./setup.sh --with-llm in the source folder.";
     $("#personalHelp").textContent = S.personal ? "Active · " + pct(S.stats.accuracy) + " accuracy on held-out sentences" : "Using the base model. Calibrate to personalise it.";
     permRows($("#permSettings"));

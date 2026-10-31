@@ -25,7 +25,8 @@ if TYPE_CHECKING:
     from .capture import CameraEngine
 
 MIN_SECONDS = 0.6
-BEAMS = {"fast": 6, "balanced": 12, "accurate": 20}
+BEAMS = {"flare": {"fast": 5, "balanced": 10, "accurate": 20},
+         "auto_avsr": {"fast": 6, "balanced": 12, "accurate": 20}}
 
 
 class Controller:
@@ -77,23 +78,30 @@ class Controller:
         self.notify("state", None)
 
     # ------------------------------------------------------------------ models
+    def model(self) -> str:
+        from .pipeline import resolve_model
+        return resolve_model(self.settings.get("model", "auto"))
+
     def decode_settings(self) -> dict:
+        model = self.model()
+        path = paths.PERSONAL_FLARE_DECODE if model == "flare" else paths.PERSONAL_DECODE
         decode = {}
-        if paths.PERSONAL_DECODE.exists():
+        if path.exists():
             try:
-                decode = json.load(open(paths.PERSONAL_DECODE))
+                decode = json.load(open(path))
             except ValueError:
                 decode = {}
-        decode["beam_size"] = BEAMS.get(self.settings.get("mode", "balanced"), 12)
+        decode["beam_size"] = BEAMS[model].get(self.settings.get("mode", "balanced"), 10)
         return decode
 
     def llm_enabled(self) -> bool:
+        """Language-model rescoring: on when installed, except in Fast mode or if calibration showed it hurts you."""
         choice = self.settings.get("llm", "auto")
         if not self.llm_available or choice == "off":
             return False
         if choice == "on":
             return True
-        return bool(self.decode_settings().get("use_llm", False))  # auto: only if calibration proved it helps
+        return self.settings.get("mode") != "fast" and self.decode_settings().get("use_llm", True)
 
     def _load_models(self):
         t0 = time.monotonic()
@@ -102,15 +110,15 @@ class Controller:
             from .pipeline import Recognizer
             decode = self.decode_settings()
             decode.pop("use_llm", None)
-            rewriter = None
+            rescorer = None
             if self.llm_enabled():
-                from .rewrite import Rewriter
-                rewriter = Rewriter()
-            rec = Recognizer(rewriter=rewriter, personal=True, decode=decode)
+                from .rewrite import Rescorer
+                rescorer = Rescorer()
+            rec = Recognizer(rescorer=rescorer, model=self.model(), personal=True, decode=decode)
             rec.warm_up()
             self.recognizer = rec
-            print(f"models ready in {time.monotonic() - t0:.1f}s (personal={rec.reader.personalized}, "
-                  f"ai_cleanup={rewriter is not None})", flush=True)
+            print(f"models ready in {time.monotonic() - t0:.1f}s (model={rec.model}, personal={rec.reader.personalized}, "
+                  f"rescoring={rescorer is not None})", flush=True)
             self._set("ready")
         except Exception as exc:
             traceback.print_exc()
@@ -324,7 +332,7 @@ class Controller:
         if res.text:
             stats.record(res.text)
             if self.settings.get("history", True):
-                save_history(res.roi, res.raw, res.text, [h.text for h in res.hyps])
+                save_history(res.clip, res.raw, res.text, [h.text for h in res.hyps])
         self.last_result = res
         self._set("ready")
         self.notify("result", res)
@@ -366,7 +374,7 @@ class Controller:
             try:
                 from . import train
                 epochs = int(os.environ["SILENTDICT_TRAIN_EPOCHS"]) if os.environ.get("SILENTDICT_TRAIN_EPOCHS") else None
-                t["report"] = train.run(log=log, progress=progress, epochs=epochs)
+                t["report"] = train.run(log=log, progress=progress, epochs=epochs, model=self.model())
             except NotEnoughData as exc:
                 t["error"] = str(exc)
             except Exception as exc:

@@ -16,11 +16,11 @@ jobs:
       - name: Install light dependencies
         run: pip install numpy opencv-python-headless pytest ruff
       - name: Lint
-        run: ruff check silentdict tests macos --select F,E9
+        run: ruff check silentdict tests macos benchmarks --select F,E9
       - name: Unit tests
         run: pytest -q tests
       - name: Shell scripts parse
-        run: bash -n setup.sh && bash -n bin/build-app && bash -n bin/silentdict
+        run: bash -n setup.sh && bash -n bin/build-app && bash -n bin/silentdict && bash -n bin/benchmark
       - name: Launcher compiles against Python
         run: clang -fsyntax-only -Wall $(python3-config --includes) macos/launcher.c
       - name: Web UI scripts parse

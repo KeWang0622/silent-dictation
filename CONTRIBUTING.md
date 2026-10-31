@@ -31,9 +31,12 @@ Useful environment variables while developing:
 | --- | --- |
 | `silentdict/controller.py` | camera, push-to-talk gestures, recognition, calibration and training, independent of any UI |
 | `silentdict/mac/` | the native app: AppKit window, menu-bar item, floating indicator and the web UI in `web/` |
-| `silentdict/vsr.py`, `pipeline.py` | lip-reading model and beam search |
+| `silentdict/flare/` | the FLARE lip reader ported to plain PyTorch, its tokenizer and the checkpoint converter |
+| `silentdict/vsr.py`, `pipeline.py` | the Auto-AVSR lip reader, and the pipeline that picks a model and rescores its guesses |
+| `silentdict/rewrite.py` | on-device language-model rescoring (MLX) |
 | `silentdict/face.py`, `roi.py`, `activity.py` | face tracking, mouth crops and lip-movement detection |
-| `silentdict/train.py` | personal fine-tuning and model selection on held-out sentences |
+| `silentdict/train.py` | personal fine-tuning for both models and model selection on held-out sentences |
+| `benchmarks/` | word error rate on 120 VidTIMIT sentences, through the app's own pipeline |
 | `macos/` | the native launcher, Info.plist and icon |
 | `third_party/espnet` | the subset of ESPnet that Auto-AVSR needs, patched for Python 3.12 and Apple GPUs |
 
@@ -42,4 +45,5 @@ Useful environment variables while developing:
 - Keep everything on-device. No network calls at run time.
 - Keep the UI in English and the copy short and plain.
 - Please don't attach recordings of anyone's face to issues or pull requests.
-- Run the tests and `ruff check silentdict tests --select F,E9` before opening a pull request.
+- Run the tests and `ruff check silentdict tests benchmarks --select F,E9` before opening a pull request.
+- If a change can affect accuracy, run `bin/benchmark` before and after and put both numbers in the pull request.

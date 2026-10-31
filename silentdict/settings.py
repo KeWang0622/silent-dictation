@@ -10,10 +10,11 @@ DEFAULTS = {
     "camera_name": None,         # None = first camera
     "camera_policy": "warm",     # "always" | "warm" (stay on a few minutes after use) | "on_demand"
     "warm_minutes": 2,
-    "llm": "auto",               # "auto" (decided by calibration) | "on" | "off"
+    "llm": "auto",               # language-model rescoring: "auto" (on unless calibration says no) | "on" | "off"
     "history": True,             # keep mouth clips of dictation for review
     "overlay": True,             # floating indicator at the bottom of the screen
     "mode": "balanced",          # "fast" | "balanced" | "accurate" (beam size)
+    "model": "auto",             # "auto" (FLARE if installed) | "flare" | "auto_avsr"
     "onboarded": False,
 }
 

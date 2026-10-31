@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
-# Install Silent Dictation: a Python environment plus checksum-verified model files (about 1 GB).
-# Usage: ./setup.sh [--with-llm] [--accept-model-license]
-#   --with-llm               also install the optional on-device language model for AI clean-up (+2 GB)
+# Install Silent Dictation: a Python environment plus checksum-verified model files.
+# Usage: ./setup.sh [--with-llm] [--no-flare] [--accept-model-license]
+#   --with-llm               also install the on-device language model for AI clean-up (+2 GB, recommended)
+#   --no-flare               skip the FLARE lip reader (a 4.8 GB download, 0.8 GB on disk; ~30% fewer mistakes)
 #   --accept-model-license   do not ask before downloading the model weights
 set -euo pipefail
 cd "$(dirname "$0")"
 
 WITH_LLM=0
+WITH_FLARE=1
 ACCEPT=0
 for arg in "$@"; do
   case "$arg" in
     --with-llm) WITH_LLM=1 ;;
     --no-llm) WITH_LLM=0 ;;
+    --no-flare) WITH_FLARE=0 ;;
     --accept-model-license) ACCEPT=1 ;;
-    -h|--help) sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 1 ;;
   esac
 done
@@ -24,9 +27,10 @@ command -v uv >/dev/null || { echo "Install uv first: brew install uv" >&2; exit
 
 cat <<'EOF'
 Model terms
-  * The default lip-reading weights (Auto-AVSR, trained on LRS3) are released by their authors for
-    non-commercial research use. They are downloaded from third-party hosts, they are NOT covered by
-    this project's Apache-2.0 licence, and a personal model fine-tuned from them inherits their terms.
+  * The lip-reading weights are released by their authors for non-commercial use: FLARE (Zhang et al.,
+    CC BY-NC 4.0) and Auto-AVSR (Ma et al., trained on LRS3, non-commercial research use). They are
+    downloaded from third-party hosts, they are NOT covered by this project's Apache-2.0 licence, and a
+    personal model fine-tuned from them inherits their terms.
   * MediaPipe Face Landmarker and the optional Qwen3-4B language model are Apache-2.0.
 EOF
 if [[ $ACCEPT -eq 0 ]]; then
@@ -48,7 +52,7 @@ fetch() {  # url destination sha256
   fi
   mkdir -p "$(dirname "$dest")"
   echo "fetch  $dest"
-  curl -fL --retry 3 --progress-bar -o "$dest.part" "$url"
+  curl -fL --retry 3 -C - --progress-bar -o "$dest.part" "$url"  # resumes an interrupted download
   if [[ "$(shasum -a 256 "$dest.part" | cut -d' ' -f1)" != "$sum" ]]; then
     rm -f "$dest.part"
     echo "checksum mismatch for $dest" >&2
@@ -75,6 +79,16 @@ fetch "https://raw.githubusercontent.com/mpc001/auto_avsr/$AVSR_REV/spm/unigram/
   models/unigram5000_units.txt 29001d967ad290e28f6f1d7d47e07e314354bf67d3b1f494e936fa2fed9a9122
 fetch "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task" \
   models/mediapipe/face_landmarker.task 64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff
+
+if [[ $WITH_FLARE -eq 1 && ! -f models/flare_large/model.pt ]]; then
+  FLARE_REV=6187ad650dc1786a8efc8b6bfbee37bbf62c4b2e
+  echo "FLARE lip reader: downloading 4.8 GB once, then converting it to a 0.8 GB file"
+  fetch "$HF/Anony94/FLARE-checkpoints/resolve/$FLARE_REV/exp_22_2_large/finetuned/checkpoints/checkpoint_last.pt" \
+    models/flare_large/checkpoint_last.pt ceaaf364ab47cda05dddc05dc109752cede57c989d7f9481b765e29e227cbf25
+  PYTHONPATH="$PWD" .venv/bin/python -m silentdict.flare.convert models/flare_large/checkpoint_last.pt \
+    models/flare_large/model.pt
+  rm -f models/flare_large/checkpoint_last.pt
+fi
 
 if [[ $WITH_LLM -eq 1 ]]; then
   echo "fetch  models/llm/Qwen3-4B-Instruct-2507-4bit (about 2 GB)"

@@ -1,81 +1,59 @@
-"""Optional local LLM that turns lip-reading n-best lists into a clean sentence (MLX, on-device)."""
+"""Optional on-device language model (MLX) that re-ranks the lip reader's candidates.
+
+The language model only scores sentences the lip reader already proposed, so it can pick the more natural of
+look-alike readings ("five" over "fine") but can never invent words. On 120 read sentences (VidTIMIT, see
+bin/benchmark) this cut FLARE's word error rate from 32.7% to 30.7% at beam 10, and to 30.3% at beam 20.
+"""
 from __future__ import annotations
 
-import re
 import threading
 
 from . import paths
-from .text import normalize, sentence_case
+from .text import sentence_case
 
-DEFAULT_LLM = paths.MODELS / "llm" / "Qwen3-4B-Instruct-2507-4bit"
-
-SYSTEM = """You fix the output of a lip-reading model used for silent dictation.
-The person mouthed one short utterance without making a sound. A visual speech recogniser produced
-several candidate transcripts (lower case, no punctuation), best first. Lip reading confuses words that
-look alike on the lips: p/b/m, f/v, th, t/d/n/s/z, k/g/ng, ch/j/sh, w/r/oo, and many vowels.
-
-Write the single most likely intended utterance:
-- Start from candidate 1. Switch to another candidate, or replace a word with a look-alike word,
-  only when that makes the sentence clearly more natural.
-- Use the recent context and the user's vocabulary when they make a reading clearly more likely.
-- Never add new ideas, greetings or explanations. Keep the length about the same.
-- Write normal sentence case with punctuation, never all caps.
-Reply with the utterance only."""
-
-EXAMPLES = [
-    ("1. i'll be there in fine minutes\n2. i'll be there in five minutes\n3. all be there in five minutes",
-     "I'll be there in five minutes."),
-    ("1. can we bush the release to next we can\n2. can we push the release to next weekend",
-     "Can we push the release to next weekend?"),
-]
+DEFAULT_LLM = paths.LLM_DIR
+WEIGHTS = {"flare": 0.3, "auto_avsr": 0.2}  # language-model weight, chosen on held-out speakers
 
 
-class Rewriter:
-    def __init__(self, model_path=None, max_tokens: int = 96):
-        from mlx_lm import generate, load
+class Rescorer:
+    def __init__(self, model_path=None):
+        from mlx_lm import load
 
-        self._generate = generate
-        self.model, self.tokenizer = load(str(model_path or DEFAULT_LLM))
-        self.max_tokens = max_tokens
+        self.model, self.tok = load(str(model_path or DEFAULT_LLM))
         self.lock = threading.Lock()
-        self.vocab = self._load_vocab()
+        vocab = self._load_vocab()
+        self.prefix = ("Words this person often uses: " + ", ".join(vocab) + "\n" if vocab else "") + \
+            "Here is something a person typed:\n"
+        self.prefix_ids = self.tok.encode(self.prefix)
+        self.cache: dict[str, float] = {}
 
     @staticmethod
     def _load_vocab() -> list[str]:
         if not paths.PERSONAL_CONTEXT.exists():
             return []
         words = [w.strip() for w in paths.PERSONAL_CONTEXT.read_text().splitlines()]
-        return [w for w in words if w and not w.startswith("#")][:200]
+        return [w for w in words if w and not w.startswith("#")][:100]
 
-    def prompt(self, candidates: list[str], context: list[str] | None = None) -> str:
-        lines = [f"{i + 1}. {c.lower()}" for i, c in enumerate(candidates)]
-        user = "Candidates:\n" + "\n".join(lines)
-        if context:
-            user = "Recent context: " + " ".join(context) + "\n\n" + user
-        if self.vocab:
-            user = "User vocabulary: " + ", ".join(self.vocab) + "\n\n" + user
-        messages = [{"role": "system", "content": SYSTEM}]
-        for question, answer in EXAMPLES:
-            messages += [{"role": "user", "content": "Candidates:\n" + question},
-                         {"role": "assistant", "content": answer}]
-        messages.append({"role": "user", "content": user})
-        return self.tokenizer.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+    def logprob(self, text: str) -> float:
+        """log P(text | prefix) under the language model, for an upper-case transcript."""
+        if text in self.cache:
+            return self.cache[text]
+        import mlx.core as mx
 
-    def __call__(self, candidates: list[str], context: list[str] | None = None) -> str:
-        if not candidates:
-            return ""
+        ids = self.tok.encode(self.prefix + sentence_case(text))
+        n = len(self.prefix_ids)
+        x = mx.array(ids)[None]
         with self.lock:
-            out = self._generate(self.model, self.tokenizer, prompt=self.prompt(candidates, context),
-                                 max_tokens=self.max_tokens, verbose=False)
-        out = re.sub(r"<think>.*?</think>", "", out, flags=re.S).strip().splitlines()
-        text = out[0].strip().strip('"').strip() if out else ""
-        # Guard against the model adding or dropping content: fall back to the recogniser's best guess.
-        n_best = len(normalize(candidates[0]).split())
-        n_out = len(normalize(text).split())
-        slack = max(1, n_best // 4)
-        if not text or n_out > n_best + slack or n_out < max(1, n_best - slack - 1):
-            return sentence_case(candidates[0])
-        if text.isupper():
-            text = sentence_case(text)
-        text = text[0].upper() + text[1:]
-        return text if text[-1] in ".?!\"')" else text + "."
+            logits = self.model(x[:, :-1]).astype(mx.float32)
+            lp = logits - mx.logsumexp(logits, axis=-1, keepdims=True)
+            tok_lp = mx.take_along_axis(lp, x[:, 1:, None], axis=-1)[0, :, 0]
+            value = float(tok_lp[n - 1:].sum())
+        if len(self.cache) > 2000:
+            self.cache.clear()
+        self.cache[text] = value
+        return value
+
+    def best(self, hyps, model: str = "flare") -> str:
+        """The candidate with the best combined lip-reading + language-model score."""
+        lam = WEIGHTS.get(model, 0.2)
+        return max(hyps, key=lambda h: (h.logprob if h.logprob is not None else h.score) + lam * self.logprob(h.text)).text

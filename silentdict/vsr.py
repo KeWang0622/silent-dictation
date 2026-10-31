@@ -66,7 +66,8 @@ def roi_to_tensor(roi: np.ndarray, offset: tuple[int, int] | None = None) -> tor
 @dataclass
 class Hypothesis:
     text: str
-    score: float
+    score: float                    # what the beam search ranks by
+    logprob: float | None = None    # total log-probability, when it differs from score (FLARE)
 
 
 def load_vsr_model(device: torch.device, personal_weights: Path | None = None) -> E2E:
@@ -182,8 +183,11 @@ class LipReader:
         toks = [self.token_list[int(i)] for i in ids if 0 < int(i) < len(self.token_list) - 1]
         return "".join(toks).replace("\u2581", " ").strip()
 
+    name = "auto_avsr"
+
     @torch.inference_mode()
-    def __call__(self, roi: np.ndarray, nbest: int = 5) -> list[Hypothesis]:
+    def __call__(self, roi, nbest: int = 5) -> list[Hypothesis]:
+        roi = getattr(roi, "lip", roi)  # a roi.Clip or a plain (T, 96, 96) array; this model reads lips only
         if len(roi) < 5:
             return []
         self.model.eval()

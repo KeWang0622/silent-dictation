@@ -5,7 +5,7 @@ import threading
 
 from .activity import motion_score
 from .dataset import add_item, delete_item, load_prompts
-from .roi import MouthCropper, frames_to_roi
+from .roi import MouthCropper, frames_to_clip
 from .text import align, sentence_case
 
 MIN_SECONDS = 0.8
@@ -45,7 +45,7 @@ class CalibrationSession:
             if motion_score([f.obs for f in frames]) < MIN_MOTION:
                 return self._retry("Your lips barely moved. Mouth the words a little more clearly.")
             try:
-                roi = frames_to_roi(frames, self.cropper)
+                roi = frames_to_clip(frames, self.cropper)
             except ValueError:
                 return self._retry("Your face left the frame. Stay centred and try again.")
             prompt = self.prompts[self.idx]
